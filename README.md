@@ -205,7 +205,7 @@ curl http://localhost:3000/api/public/health
 
 - **平台**：Cloudflare Pages（沙盒 PM2 + wrangler pages dev 运行中）
 - **状态**：✅ 开发环境运行中；生产未部署
-- **最后更新**：2026-10-11
+- **最后更新**：2026-10-11（v4：真实算力接入 + 流式 Agent + 经营报表/设置）
 
 ## 免责声明
 
