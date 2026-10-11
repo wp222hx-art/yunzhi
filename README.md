@@ -15,10 +15,11 @@
 
 ## 访问地址
 
+- **GitHub**：https://github.com/wp222hx-art/yunzhi
 - **沙盒预览**：https://3000-iom0iwx7idi6d45o8v8db-5c13a017.sandbox.novita.ai
 - **门户首页**：`/`（含三个免费测算器：从业人员累计预扣、企业成本对比、OPC 三阶跃迁）
 - **登录**：`/login`
-- **演示直登**：`/demo/admin` · `/demo/enterprise` · `/demo/opc`
+- **演示直登**：`/demo/admin` · `/demo/enterprise` · `/demo/opc` · `/demo/worker`（支持 `#view` 直达）
 
 | 角色（面向客户） | 账号 | 密码 | 入口 | 一键直登 |
 |---|---|---|---|---|
