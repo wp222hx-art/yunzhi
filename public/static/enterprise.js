@@ -42,6 +42,7 @@ VIEWS.dashboard = async () => {
       ${btn('<i class="fas fa-play mr-1"></i>一键跑通演示流程', 'primary', 'id="run-demo" class="mt-4 w-full"')}
     </div>
   </div>
+  <div class="mt-4">${card('<i class="fas fa-robot text-brand-600 mr-2"></i>AI 数字员工 · 今天帮您做什么', `<div class="grid md:grid-cols-4 gap-3">${[['compliance_doctor', 'fa-stethoscope', '用工合规体检', '30 分钟出报告'], ['task_pricer', 'fa-sitemap', '把需求拆成任务包', '可一键创建任务'], ['ecom_copywriter', 'fa-pen-nib', '写电商文案', '自动规避广告法'], ['finance_assistant', 'fa-file-invoice-dollar', '发票能否扣除', '附政策依据']].map(([k, i, t, d]) => `<button onclick="openAgent('${k}')" class="text-left rounded-xl border p-3 hover:border-brand-500 hover:bg-brand-50/40 transition"><i class="fas ${i} text-brand-600"></i><div class="font-medium text-sm mt-1">${t}</div><div class="text-xs text-slate-500">${d}</div></button>`).join('')}</div><div class="mt-3 text-right"><a href="#ai" class="text-sm text-brand-600">全部 15 个数字员工 <i class="fas fa-arrow-right"></i></a></div>`)}</div>
   <div class="mt-4">${card('快捷操作', `<div class="flex flex-wrap gap-2">${btn('<i class="fas fa-plus mr-1"></i>新增人员', 'primary', 'onclick="location.hash=\'employees\'"')}${btn('<i class="fas fa-calculator mr-1"></i>薪酬试算', 'ghost', 'onclick="location.hash=\'payroll\'"')}${btn('<i class="fas fa-list-check mr-1"></i>发布任务（AI风控）', 'ghost', 'onclick="location.hash=\'tasks\'"')}${btn('<i class="fas fa-scale-balanced mr-1"></i>用工方案成本对比', 'ghost', 'onclick="location.hash=\'compare\'"')}</div>`)}</div>`;
   $('#run-demo').onclick = async () => { try { const { data } = await eapi.post('/demo/run-flow', {}); modal('演示流程已完成 ✓', `<div class="text-sm space-y-2"><div>✅ 发布任务「演示任务 · 短视频剪辑」（AI 评分 0，绿色放行）</div><div>✅ 从业人员 <b>${esc(data.worker)}</b> 实名签约，电子合同已存证</div><div>✅ 交付 10 条成片，SHA-256 存证</div><div>✅ 您已验收，金额 <b>${money(data.amount)}</b> 进入待结算</div><div class="mt-4 p-3 bg-brand-50 rounded-lg text-brand-800"><i class="fas fa-arrow-right mr-1"></i>${data.next}</div></div>`, { footer: btn('稍后', 'ghost', 'onclick="closeModal()"') + btn('去薪酬管理发放 →', 'primary', 'onclick="closeModal();location.hash=\'payroll\'"') }); } catch (e) { toast(errMsg(e), 'error'); } };
   chart('trend-chart', { type: 'bar', data: { labels: d.trend.map(t => t.period), datasets: [{ label: '用工总成本', data: d.trend.map(t => t.cost), backgroundColor: '#2f5bea' }, { label: '实发', data: d.trend.map(t => t.net), backgroundColor: '#10b981' }] }, options: { plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } } });
@@ -129,14 +130,15 @@ VIEWS.tasks = async () => {
   const [{ data: tasks }, { data: apps }] = await Promise.all([eapi.get('/tasks'), eapi.get('/applications')]);
   const pendingDeliv = tasks.reduce((s, t) => s + 0, 0);
   $('#view').innerHTML = `
-  <div class="flex items-center justify-between mb-4"><p class="text-sm text-slate-500">流程：发布任务（AI评分）→ 从业人员申请 → 您确认签约 → 对方交付 → 您验收 → 进入薪酬结算</p>${btn('<i class="fas fa-plus mr-1"></i>发布任务', 'primary', 'id="add-task"')}</div>
+  <div class="flex items-center justify-between mb-4 flex-wrap gap-2"><p class="text-sm text-slate-500">流程：发布任务（AI评分）→ 从业人员申请 → 您确认签约 → 对方交付 → 您验收 → 进入薪酬结算</p><div class="flex gap-2">${btn('<i class="fas fa-robot mr-1"></i>AI 帮我拆解定价', 'ghost', `onclick="openAgent('task_pricer')"`)}${btn('<i class="fas fa-plus mr-1"></i>发布任务', 'primary', 'id="add-task"')}</div></div>
   ${apps.length ? card(`<i class="fas fa-inbox text-brand-600 mr-2"></i>接单申请（${apps.length}）· 需要您确认`, `<div class="space-y-2">${apps.map(a => `<div class="flex items-center justify-between rounded-xl border p-3 bg-brand-50/50"><div class="text-sm"><b>${esc(a.worker_name)}</b> ${a.verified ? badge('green', '已实名') : badge('red', '未实名')} 申请「${esc(a.title)}」<div class="text-xs text-slate-500">${esc(a.skills || '')} · ${esc(a.region || '')} · ${money(a.unit_price)} × ${a.quantity}${a.message ? ' · "' + esc(a.message) + '"' : ''}</div></div><div class="flex gap-2">${btn('确认签约', 'success', `data-app-ok="${a.id}"`)}${btn('婉拒', 'ghost', `data-app-no="${a.id}"`)}</div></div>`).join('')}</div>`) + '<div class="h-4"></div>' : ''}
-  ${card('', table(['任务', '类别', '计价', '预算', '风险评分', '状态', '接单', '截止', '操作'], tasks.map(t => [`<b>${esc(t.title)}</b><div class="text-xs text-slate-400 max-w-xs truncate">${esc(t.description || '')}</div>`, esc(t.category || ''), `${PRICING[t.pricing_mode]}<div class="text-xs text-slate-400">${money(t.unit_price)} × ${t.quantity}</div>`, money(t.budget), `<span class="font-bold ${{ green: 'text-emerald-600', yellow: 'text-amber-500', red: 'text-red-600' }[t.risk_level]}">${t.risk_score}</span> ${badge(t.risk_level, t.risk_level)}`, sbadge(t.status), t.order_count, t.deadline || '', `${btn('风控详情', 'ghost', `data-risk="${t.id}"`)} ${t.status === 'published' ? btn('派单/签约', 'ghost', `data-assign="${t.id}"`) : ''} ${btn((t.delivered_count ? '<span class="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1"></span>验收(' + t.delivered_count + ')' : '订单'), t.delivered_count ? 'primary' : 'ghost', `data-orders="${t.id}"`)}`])))}`;
+  ${card('', table(['任务', '类别', '计价', '预算', '风险评分', '状态', '接单', '截止', '操作'], tasks.map(t => [`<b>${esc(t.title)}</b><div class="text-xs text-slate-400 max-w-xs truncate">${esc(t.description || '')}</div>`, esc(t.category || ''), `${PRICING[t.pricing_mode]}<div class="text-xs text-slate-400">${money(t.unit_price)} × ${t.quantity}</div>`, money(t.budget), `<span class="font-bold ${{ green: 'text-emerald-600', yellow: 'text-amber-500', red: 'text-red-600' }[t.risk_level]}">${t.risk_score}</span> ${badge(t.risk_level, t.risk_level)}`, sbadge(t.status), t.order_count, t.deadline || '', `${btn('风控详情', 'ghost', `data-risk="${t.id}"`)} ${t.status === 'draft' ? btn('发布', 'success', `data-publish="${t.id}"`) : ''} ${t.status === 'published' ? btn('派单/签约', 'ghost', `data-assign="${t.id}"`) : ''} ${btn((t.delivered_count ? '<span class="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1"></span>验收(' + t.delivered_count + ')' : '订单'), t.delivered_count ? 'primary' : 'ghost', `data-orders="${t.id}"`)}`])))}`;
   $('#add-task').onclick = taskForm;
   $$('[data-app-ok]').forEach(b => b.onclick = async () => { try { const { data } = await eapi.post(`/applications/${b.dataset.appOk}/decide`, { accept: true }); toast(`签约成功，电子合同 ${data.contract_no}`); route(); } catch (e) { toast(errMsg(e), 'error'); } });
   $$('[data-app-no]').forEach(b => b.onclick = async () => { await eapi.post(`/applications/${b.dataset.appNo}/decide`, { accept: false }); toast('已婉拒', 'warn'); route(); });
   $$('[data-risk]').forEach(b => b.onclick = () => { const t = tasks.find(x => x.id == b.dataset.risk); modal(`风控评估 · ${esc(t.title)}`, riskPanel(t.risk_detail), { footer: btn('关闭', 'ghost', 'onclick="closeModal()"') }); });
   $$('[data-assign]').forEach(b => b.onclick = () => assignForm(tasks.find(x => x.id == b.dataset.assign)));
+  $$('[data-publish]').forEach(b => b.onclick = async () => { try { await eapi.post(`/tasks/${b.dataset.publish}/publish`, {}); toast('已发布'); route(); } catch (e) { toast(errMsg(e), 'error'); } });
   $$('[data-orders]').forEach(b => b.onclick = () => ordersView(tasks.find(x => x.id == b.dataset.orders)));
 };
 function taskForm() {
@@ -190,3 +192,53 @@ VIEWS.compare = async () => {
 };
 
 VIEWS.logs = async () => { const { data } = await eapi.get('/audit-logs'); $('#view').innerHTML = card('操作日志（AI决策审计 + 人工操作留痕）', table(['时间', '操作人', '动作', '对象', '详情'], data.map(l => [l.created_at, esc(l.user_name), `<span class="font-mono text-xs">${l.action}</span>`, esc(l.target || ''), esc(l.detail || '')]))); };
+
+/* ---------------- 经营报表 ---------------- */
+VIEWS.reportcenter = async () => {
+  const year = period().slice(0, 4);
+  const { data: r } = await eapi.get('/reports/summary', { year });
+  const periods = [...new Set([...r.payroll.map(x => x.period), ...r.settle.map(x => x.period)])].sort();
+  const sum = (arr, k) => arr.reduce((s, x) => s + (+x[k] || 0), 0);
+  const risk = Object.fromEntries(r.risk.map(x => [x.risk_level, x.n]));
+  const dl = t => `${location.origin}/api/enterprise/reports/export/${t}?period=${period()}${EP ? '&' + EP.slice(1) : ''}`;
+  $('#view').innerHTML = `
+  <div class="grid md:grid-cols-4 gap-4">
+    ${stat(year + ' 年用工总成本', money(sum(r.payroll, 'cost')), `个税 ${money(sum(r.payroll, 'tax'))} · 单位社保 ${money(sum(r.payroll, 'ins'))}`, 'fa-coins', 'amber')}
+    ${stat('平台结算总额', money(r.saving.payout), `服务费 ${money(sum(r.settle, 'fee'))} · ${sum(r.settle, 'n')} 笔`, 'fa-file-shield', 'emerald')}
+    ${stat('较传统灵工节省', money(r.saving.vs_legacy), `较无凭证直接支付节省 ${money(r.saving.vs_direct)}（含25%不可扣除）`, 'fa-piggy-bank')}
+    ${stat('任务风控', `${risk.green || 0}/${risk.yellow || 0}/${risk.red || 0}`, '绿 / 黄 / 红 · AI 调用 ' + sum(r.ai, 'n') + ' 次', 'fa-shield-halved', 'red')}
+  </div>
+  <div class="grid lg:grid-cols-2 gap-4 mt-4">
+    ${card('月度用工成本（按层级）', '<canvas id="rc-cost" height="200"></canvas>')}
+    ${card('平台结算与税款', '<canvas id="rc-settle" height="200"></canvas>')}
+  </div>
+  <div class="grid lg:grid-cols-2 gap-4 mt-4">
+    ${card('部门 × 层级分布', table(['部门', '层级', '人数', '月薪合计'], r.dept.map(d => [esc(d.d), LAYER[d.layer][0], d.n, money(d.salary)])))}
+    ${card('数据导出（CSV · 可直接导入 Excel / 财务系统）', `<div class="space-y-2 text-sm">${[['payroll', '薪酬明细表', '本期全部层级每人应发/扣款/个税/实发/企业成本'], ['settlements', '平台结算表', '本期任务层每笔结算、预扣、服务费、凭证状态'], ['employees', '人员花名册', '全部在册人员及三层属性']].map(([t, n, d]) => `<div class="flex items-center justify-between border-b border-slate-100 py-2"><div><div class="font-medium">${n}</div><div class="text-xs text-slate-500">${d}</div></div><a href="${dl(t)}" class="text-sm bg-brand-600 text-white px-3 py-1.5 rounded-lg"><i class="fas fa-download mr-1"></i>导出 ${period()}</a></div>`).join('')}</div><div class="text-xs text-slate-400 mt-3">导出需登录态（Cookie）；申报表与完税凭证请在平台合规申报中心下载。</div>`)}
+  </div>`;
+  const byLayer = l => periods.map(p => r.payroll.filter(x => x.period === p && x.layer === l).reduce((s, x) => s + x.cost, 0));
+  chart('rc-cost', { type: 'bar', data: { labels: periods, datasets: [{ label: '核心层', data: byLayer('core'), backgroundColor: '#2f5bea' }, { label: '弹性层', data: byLayer('flex'), backgroundColor: '#f59e0b' }, { label: '任务层', data: byLayer('task'), backgroundColor: '#10b981' }] }, options: { plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true } } } });
+  chart('rc-settle', { type: 'line', data: { labels: r.settle.map(x => x.period), datasets: [{ label: '结算额', data: r.settle.map(x => x.amt), borderColor: '#2f5bea', tension: .3 }, { label: '预扣个税', data: r.settle.map(x => x.iit), borderColor: '#ef4444', tension: .3 }, { label: '服务费', data: r.settle.map(x => x.fee), borderColor: '#f59e0b', tension: .3 }] }, options: { plugins: { legend: { position: 'bottom' } } } });
+};
+
+/* ---------------- 企业设置 ---------------- */
+VIEWS.settings = async () => {
+  const { data: p } = await eapi.get('/profile');
+  const sc = p.social_config;
+  $('#view').innerHTML = `<div class="grid lg:grid-cols-2 gap-4">
+    ${card('企业信息', `<div class="grid md:grid-cols-2 gap-3">${input('s-name', '企业名称', p.name)}${input('s-code', '统一社会信用代码', p.credit_code || '', 'text', 'disabled')}${select('s-type', '纳税人身份（影响进项抵扣与成本对比）', [['general', '一般纳税人'], ['small', '小规模纳税人']], p.taxpayer_type)}${input('s-ind', '行业', p.industry)}${input('s-region', '地区（影响代征协议匹配）', p.region)}${input('s-contact', '联系人', p.contact_name)}${input('s-phone', '电话', p.contact_phone)}<div class="flex items-end"><div class="text-sm text-slate-500">平台服务费率 <b>${(p.service_rate * 100).toFixed(1)}%</b>（由平台设置）</div></div></div><div class="mt-4">${btn('保存', 'primary', 'id="s-save"')}</div>`)}
+    ${card('社保公积金参数（核心层计薪依据）', `<div class="grid grid-cols-3 gap-2 text-sm"><div class="text-xs text-slate-500">险种</div><div class="text-xs text-slate-500">个人比例</div><div class="text-xs text-slate-500">单位比例</div>${[['pension', '养老'], ['medical', '医疗'], ['unemployment', '失业'], ['injury', '工伤'], ['maternity', '生育'], ['housing', '公积金']].map(([k, n]) => `<div class="py-1">${n}</div><input data-sp="${k}" value="${sc[k].p}" step="0.001" type="number" class="border rounded px-2 py-1"><input data-se="${k}" value="${sc[k].e}" step="0.001" type="number" class="border rounded px-2 py-1">`).join('')}</div><div class="grid grid-cols-2 gap-3 mt-3">${input('s-bmin', '缴费基数下限', sc.base_min, 'number')}${input('s-bmax', '缴费基数上限', sc.base_max, 'number')}</div><div class="mt-3">${btn('保存参数', 'primary', 'id="s-social"')}</div><div class="text-xs text-slate-400 mt-2">按当地人社/公积金中心公布的年度比例与基数填写；修改后下期试算生效。</div>`)}
+  </div>
+  <div class="mt-4">${card('批量导入人员（CSV）', `<p class="text-sm text-slate-600">列顺序：<code>姓名,身份证,手机,层级(core/flex/task),用工形态(fulltime/parttime/dispatch/outsource/platform),岗位,部门,月薪,时薪,社保基数,公积金基数,专项附加,入职日期</code>。第一行为表头将自动跳过。任务层人员会与在职员工比对身份证（老员工转灵工拦截）。</p><div class="mt-3 flex items-center gap-3"><input type="file" id="imp-file" accept=".csv,text/csv" class="text-sm"><a href="data:text/csv;charset=utf-8,%EF%BB%BF姓名,身份证,手机,层级,用工形态,岗位,部门,月薪,时薪,社保基数,公积金基数,专项附加,入职日期%0A示例·李四,440301199001011234,13800000000,core,fulltime,运营专员,运营部,12000,0,12000,12000,1000,2026-01-01" download="人员导入模板.csv" class="text-sm text-brand-600 underline">下载模板</a></div><div id="imp-preview" class="mt-3"></div>`)}</div>`;
+  $('#s-save').onclick = async () => { await eapi.put('/profile', { name: v('s-name'), taxpayer_type: v('s-type'), industry: v('s-ind'), region: v('s-region'), contact_name: v('s-contact'), contact_phone: v('s-phone') }); toast('已保存'); };
+  $('#s-social').onclick = async () => { const cfg = { base_min: num('s-bmin'), base_max: num('s-bmax') }; ['pension', 'medical', 'unemployment', 'injury', 'maternity', 'housing'].forEach(k => cfg[k] = { p: +$(`[data-sp="${k}"]`).value, e: +$(`[data-se="${k}"]`).value }); await eapi.put('/profile', { social_config: cfg }); toast('社保参数已保存，下期试算生效'); };
+  $('#imp-file').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return; const text = await f.text();
+    const lines = text.replace(/^\ufeff/, '').split(/\r?\n/).filter(l => l.trim());
+    const keys = ['name', 'id_no', 'phone', 'layer', 'employment_type', 'position', 'department', 'base_salary', 'hourly_rate', 'social_base', 'housing_base', 'special_deduction', 'start_date'];
+    const rows = lines.slice(/姓名/.test(lines[0]) ? 1 : 0).map(l => { const c = l.split(',').map(x => x.trim().replace(/^"|"$/g, '')); return Object.fromEntries(keys.map((k, i) => [k, c[i] || ''])); }).filter(r => r.name);
+    $('#imp-preview').innerHTML = table(['姓名', '层级', '形态', '岗位', '月薪'], rows.slice(0, 20).map(r => [esc(r.name), r.layer, r.employment_type, esc(r.position), r.base_salary])) + `<div class="mt-2 text-sm">共 ${rows.length} 行 ${btn('确认导入', 'primary', 'id="imp-go"')}</div>`;
+    $('#imp-go').onclick = async () => { const { data } = await eapi.post('/employees/import', { rows }); toast(`导入 ${data.ok} 人${data.skipped.length ? '，跳过：' + data.skipped.join('、') : ''}`, data.skipped.length ? 'warn' : 'success'); location.hash = 'employees'; };
+  };
+};
+Object.assign(HELP.enterprise, { reportcenter: ['经营报表', '年度用工成本、平台结算、节省对比、部门分布，以及 CSV 导出。', ['切换顶部期间可导出对应月份', '导出 CSV 可直接导入财务系统']], settings: ['企业设置', '企业信息、纳税人身份、社保公积金比例与基数、人员批量导入。', ['先下载模板再导入', '社保参数修改后下期试算生效']], reports: ['AI 报告', 'Agent 输出沉淀为报告资产，含存证哈希，可打印导出。', ['在 Agent 结果上点「保存为报告」']] });

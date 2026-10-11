@@ -40,10 +40,19 @@
 
 | 角色 | 每月只需做 |
 |---|---|
-| 企业 HR | ① 验收交付 → ② 三层薪酬试算→审批→发放 → ③ 拿凭证包（或点「一键跑通演示流程」） |
+| 企业 HR | ① 验收交付 → ② 三层薪酬试算→审批→发放 → ③ 拿凭证包（或点「一键跑通演示流程」）；用工前可先让 **AI 拆解定价师** 把需求拆成任务草稿 |
 | 灵活就业者 | ① 1分钟实名 → ② 任务大厅申请 → ③ 提交交付；然后看收入与税负 |
 | OPC | ① 记收入/成本 → ② 股东工资+分红试算发放 → ③ 看税务测算与三阶跃迁 |
-| 平台运营 | 按「待办」：实名核验 → 风控复核 → 申报复核提交 → 代征解缴出凭证 |
+| 平台运营 | 按「待办」：实名核验 → 风控复核 → 申报复核提交 → 代征解缴出凭证；首次上线先到 `#gateway` 粘贴上游 Key |
+
+### 企业 AI 赋能工具——完整操作流程（以「任务拆解定价师」为例）
+
+1. 企业端首页「AI 数字员工」卡片或 `#ai` → 选 Agent（或在「任务与交付」点「AI 帮我拆解定价」）
+2. 填需求与预算 → 可先点「预览 DLP 与路由」看命中了哪些敏感规则、会走哪个模型/资源池 → 「运行」
+3. 流式输出（打字机），顶部显示模型、资源池、DLP 处置、Token 与 Credits 计费、存证哈希
+4. 完成后动作条：**保存为报告**（沉淀到 `#reports`，可打印导出） / **复制** / **一键创建为任务草稿**（解析表格 → 确认 → 自动风控评分 → 草稿进入「任务与交付」）
+5. 在「任务与交付」对草稿点「发布」：绿色直接上架 / 黄色进入平台复核 / 红色拦截并给出改造建议 → 进入 8 步主流程
+6. 月底到「经营报表」看用工成本结构 / 结算趋势 / 部门分布 / AI 用量与节省测算，一键导出 CSV；「企业设置」维护纳税人身份、社保参数、批量导入人员
 
 ## 已完成的四大核心模块
 
@@ -71,6 +80,9 @@
 - 风控硬规则：**老员工转灵工一票否决**（身份证与核心/弹性层在职及近3个月离职比对）、未实名不可签约、"坐班+月薪"组合直接升红
 - 五流合一凭证包（合同/业务/资金/票据/个税）一键导出审计 JSON
 - 用工方案成本对比（直接支付 / 传统灵工 / 云工智合佳，区分一般/小规模纳税人）
+- **经营报表** `#reportcenter`：年度用工总成本（堆叠图：工资/个税/单位社保）、平台结算趋势、任务与风控统计、部门分布、AI 用量、与传统方案的节省测算；薪酬 / 结算 / 人员 CSV 导出（带 BOM，Excel 直开）
+- **企业设置** `#settings`：企业资料与纳税人身份、社保公积金比例与基数上下限、人员 CSV 批量导入（模板下载，导入时同样执行老员工转灵工校验）
+- 首页 AI 快捷入口（合规诊断 / 拆解定价 / 智能合同 / 税负解读）；任务草稿「发布」按风控等级分流
 
 ### 4️⃣ OPC 薪酬管理与经营舱（`/opc`）
 - 经营舱：收入/成本趋势、客户结构、年化税负推荐、**四道防火墙**（财产独立 / 注册资本 / 客户集中度>70%预警 / 发票与成本）
@@ -104,7 +116,23 @@
 | L4 资源适配 | 境内备案池 + 海外可控池；多供应商优先级；连通性检查 | `ai_providers / ai_models` |
 | L5 运营合规 | Token 计量计费、返 Token、订单、SHA-256 存证哈希 | `ai_usage / ai_wallet_txns` |
 
-**接入真实算力**：平台后台 → 算力网关 → 在「算力网 · 统一算力网关」卡片填入上游 API Key（Base URL 默认 `https://api.suanli.com/v1`）→ 状态改为"已启用"→ 保存。未配置时为演示模式（链路完整、输出为结构化示例并明确标注）。
+### 🔑 接入真实算力（三种方式，可同时启用）
+
+上游 Key 的解析顺序：**后台数据库中保存的 Key → 环境变量 → 演示模式**（`src/lib/gateway.ts resolveProvider`）。任一供应商在线后，智能路由只在在线模型中选择；全部离线时回退为演示模式并在界面明确标注。
+
+| 供应商 | 适用池 | 后台填写位置 | 环境变量（`.dev.vars` 本地 / `wrangler secret put` 生产） | 默认 Base URL |
+|---|---|---|---|---|
+| **DeepSeek 官方** | 境内备案池 | 平台后台 → 算力网关 → DeepSeek 卡片 | `DEEPSEEK_API_KEY`（可选 `DEEPSEEK_BASE_URL`） | `https://api.deepseek.com/v1` |
+| **算力网（suanli）统一网关** | 境内备案池（60+ 模型） | 平台后台 → 算力网关 → 算力网卡片 | `SUANLI_API_KEY`（可选 `SUANLI_BASE_URL`） | `https://api.suanli.com/v1` |
+| **平台托管（GPT-5 系列）** | 海外可控池 | 平台后台 → 算力网关 → 平台托管卡片 | `PLATFORM_LLM_API_KEY` + `PLATFORM_LLM_BASE_URL` | 由环境变量指定 |
+
+操作：**平台后台 `/admin#gateway` → 对应卡片粘贴 Key → 「测试连通」**（真实发一条最小请求，成功后自动置为已启用）→ 企业端 `#ai` 顶部横幅会显示「已接入真实算力：xxx」，模型下拉中带绿色「真实算力」徽标。
+
+> 当前沙盒已通过环境变量接入平台托管 GPT-5 / GPT-5 mini / GPT-5 nano（海外可控池）。**敏感业务（薪酬 / 身份证 / 合同）会被 DLP 强制走境内池**，因此强烈建议再粘贴一个 DeepSeek 官方 Key 或算力网 Key，让境内池上线，涉税 Agent 才能全部由真实模型解释。
+
+**GPT-5 兼容**：网关自动为 `gpt-5*` / `o*` 模型改用 `max_completion_tokens` 并去掉 `temperature`。
+
+**流式输出**：`POST /api/ai/chat/stream`（SSE，事件 `meta / delta / done / blocked / error`），前端 Agent 弹窗打字机式呈现，完成后给出「保存为报告 / 复制 / 一键创建为任务草稿 / 跳转业务页」动作。
 
 ### 平台后台其他能力
 风控中心（评估记录、人工放行/拦截、T+0 异常监测：一人多号、经济从属、起征点、实名、OPC集中度、AI 评分沙盒）、企业入驻与费率/风险等级管理、从业人员实名核验、OPC 管理、政策法规库（9 条，附文号与生效日期）、规则引擎参数化配置、审计日志。
@@ -127,7 +155,9 @@
 | `GET /api/admin/risk/assessments|monitor` `POST /risk/assess` `POST /risk/tasks/:id/decision` | 风控 |
 | `GET/POST/PUT /api/admin/enterprises` `GET/POST /workers` `POST /workers/:id/verify` `GET /opcs` `GET /policies` `GET/PUT /settings` `GET /audit-logs` | 平台管理 |
 | `GET /api/ai/overview|wallet|models|agents|usage|catalog|orders|conversations` `POST /ai/chat|image|route/preview|dlp/test|wallet/recharge|wallet/plan|wallet/rotate-key|catalog/:id/order` `PUT /ai/wallet/settings` | AI 赋能中心 |
-| `GET/PUT /api/admin/ai/providers|models|dlp/rules|agents|catalog|orders` `POST /admin/ai/providers/:key/check` `GET /admin/ai/stats` | 算力网关管理 |
+| `POST /api/ai/chat/stream`（SSE） `GET/POST/DELETE /api/ai/reports[/:id]` `POST /api/ai/actions/create-tasks` | 流式对话 · AI 报告沉淀 · Agent 结果转任务草稿 |
+| `GET/PUT /api/admin/ai/providers|models|dlp/rules|agents|catalog|orders` `POST /admin/ai/providers/:key/check`（真实连通测试） `GET /admin/ai/stats` | 算力网关管理（返回 `key_source: db/env/none`、`live`） |
+| `GET /api/enterprise/reports/summary` `GET /reports/export/:type`（payroll/settlements/employees CSV） `POST /employees/import` `GET /notifications` `POST /tasks/:id/publish` | 经营报表 · 导入导出 · 通知 · 草稿发布 |
 | `POST /v1/chat/completions` `GET /v1/models` | 对外 OpenAI 兼容网关 |
 | `GET /api/worker/home|hall|income|tax` `POST /worker/verify` `POST /worker/hall/:id/apply` `POST /worker/orders/:id/deliver` | 从业人员端 |
 | `GET /api/guide/progress` `GET /api/guide/todos` | 流程进度与角色待办 |
@@ -138,7 +168,7 @@
 
 `users(含 worker 角色与 onboarded) / sessions / task_applications / enterprises / employees / payroll_batches / payroll_items / workers / tasks / task_orders / settlements / tax_filings / collection_agreements / collection_records / opcs / opc_incomes / opc_expenses / opc_payrolls / risk_assessments / audit_logs / policies / platform_settings`
 
-迁移文件：`migrations/0001_initial_schema.sql`、`0002_worker_role.sql`、`0003_ai_center.sql`；AI 种子：`seed_ai.sql`；演示数据：`seed.sql`
+迁移文件：`migrations/0001_initial_schema.sql`、`0002_worker_role.sql`、`0003_ai_center.sql`、`0004_providers_reports.sql`（供应商 env_var 列、`ai_reports`、`notifications`）；AI 种子：`seed_ai.sql`、`seed_providers.sql`（DeepSeek / 平台托管供应商与模型）；演示数据：`seed.sql`
 
 ## 规则引擎（`src/lib/tax.ts` / `src/lib/risk.ts`）
 
@@ -154,7 +184,10 @@
 ```bash
 npm install
 npm run build
-npm run db:migrate:local && npm run db:seed && npx wrangler d1 execute webapp-production --local --file=./seed_ai.sql
+npm run db:migrate:local && npm run db:seed
+npx wrangler d1 execute webapp-production --local --file=./seed_ai.sql
+npx wrangler d1 execute webapp-production --local --file=./seed_providers.sql
+cp .dev.vars.example .dev.vars   # 填入 DEEPSEEK_API_KEY / SUANLI_API_KEY / PLATFORM_LLM_*（可选，也可在后台粘贴）
 pm2 start ecosystem.config.cjs                 # 或 npm run dev:sandbox
 curl http://localhost:3000/api/public/health
 ```
@@ -162,11 +195,11 @@ curl http://localhost:3000/api/public/health
 ## 尚未实现 / 下一步建议
 
 1. **真实外部对接**：持牌支付机构受托分账 API、电子签/司法存证、公安三要素+人脸活体、电子税务局申报接口（当前为流程模拟）
-2. **算力网关真实接入**：填入上游 API Key 即可；后续补流式 SSE 输出、视频异步任务轮询、Embedding/RAG 法规库、MCP 工具调用
+2. **算力网关**：文本对话已真实接入 + 流式输出；后续补视频异步任务轮询、Embedding/RAG 法规库、MCP 工具调用、通知中心 UI
 3. 社保公积金地区参数库、专项附加扣除明细申报、年度汇算提醒
 4. 渠道合伙人分级与分佣结算、企业合规 SaaS 订阅计费
 5. 等保三级、数据分级分类、人脸特征值加密存储、PIPL 单独同意流程
-6. 生产部署：`npx wrangler d1 create webapp-production` 后回填 `database_id`，`npm run db:migrate:prod`，再部署
+6. 生产部署：`npx wrangler d1 create webapp-production` 后回填 `database_id`，`npm run db:migrate:prod` + 三个 seed，`wrangler secret put DEEPSEEK_API_KEY`（及其他 Key），再部署
 
 ## 部署状态
 

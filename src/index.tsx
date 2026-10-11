@@ -10,7 +10,7 @@ import adminRoutes from './routes/admin'
 import workerRoutes from './routes/worker'
 import guideRoutes from './routes/guide'
 import aiRoutes, { aiAdmin } from './routes/ai'
-import { runDlp, dlpOutput, routeModel, callChat, creditsFor, evidenceHash, type ModelRow, type DlpRule } from './lib/gateway'
+import { runDlp, dlpOutput, routeModel, callChat, creditsFor, evidenceHash, resolveProvider, type ModelRow, type DlpRule } from './lib/gateway'
 import { laborCumulative, laborLegacy, vatAgent, opcCompare, enterpriseCostCompare, wageCumulative, socialInsurance, DEFAULT_SOCIAL, r2 } from './lib/tax'
 import { scoreLaborRisk } from './lib/risk'
 import { landingPage, loginPage, appShell, guidePage } from './pages'
@@ -47,10 +47,14 @@ app.post('/v1/chat/completions', async (c) => {
   const last = [...messages].reverse().find((m: any) => m.role === 'user') || { content: '' }
   const dlp = runDlp(String(last.content || ''), rules, w.dlp_level)
   if (dlp.action === 'block') return c.json({ error: { message: `DLP blocked: ${dlp.hits.map(h => h.name).join(',')}`, type: 'dlp_blocked' } }, 400)
-  const models = (await c.env.DB.prepare(`SELECT * FROM ai_models WHERE status='active'`).all<ModelRow>()).results
+  const provRows = (await c.env.DB.prepare(`SELECT * FROM ai_providers`).all<any>()).results
+  const provs: Record<string, any> = {}; provRows.forEach(p => provs[p.key] = resolveProvider(p, c.env))
+  const anyLive = Object.values(provs).some(p => p.live)
+  let models = (await c.env.DB.prepare(`SELECT * FROM ai_models WHERE status='active'`).all<ModelRow>()).results
+  if (anyLive) models = models.filter(m => provs[m.provider_key]?.live)
   const route = routeModel(models, { type: 'chat', policy: w.routing_policy, poolPolicy: w.pool_policy, forceDomestic: dlp.forceDomestic, preferred: b.model && b.model !== 'auto' ? b.model : undefined })
   if (!route) return c.json({ error: { message: 'no model available' } }, 503)
-  const provider = await c.env.DB.prepare(`SELECT * FROM ai_providers WHERE key=?`).bind(route.model.provider_key).first<any>()
+  const provider = provs[route.model.provider_key]
   const sanitized = messages.map((m: any) => m === last ? { ...m, content: dlp.text } : m)
   const t0 = Date.now()
   const out = await callChat(provider, route.model.model_id, sanitized, { temperature: b.temperature, max_tokens: b.max_tokens })
@@ -120,7 +124,7 @@ app.get('/demo/:role', async (c) => {
   const token = randomToken()
   await c.env.DB.prepare(`INSERT INTO sessions (token,user_id,expires_at) VALUES (?,?,datetime('now','+12 hours'))`).bind(token, u.id).run()
   c.header('Set-Cookie', `cw_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200`)
-  return c.html(`<script>localStorage.setItem('cw_token','${token}');location.href='/${c.req.param('role')}'</script>`)
+  return c.html(`<script>localStorage.setItem('cw_token','${token}');location.href='/${c.req.param('role')}'+location.hash</script>`)
 })
 app.get('/admin', async (c) => { const u = await loadUser(c); if (!u || u.role !== 'admin') return c.redirect('/login?next=/admin'); return c.html(appShell('admin', u)) })
 app.get('/enterprise', async (c) => { const u = await loadUser(c); if (!u || !['enterprise', 'admin'].includes(u.role)) return c.redirect('/login?next=/enterprise'); return c.html(appShell('enterprise', u)) })

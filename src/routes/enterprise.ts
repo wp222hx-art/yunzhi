@@ -293,6 +293,14 @@ ent.post('/tasks', async (c) => {
   await audit(c.env.DB, c.get('user'), 'CREATE_TASK', `task:${r.meta.last_row_id}`, `${b.title} 风险${risk.score}分/${risk.level}`)
   return c.json({ id: r.meta.last_row_id, status, risk })
 })
+ent.post('/tasks/:id/publish', async (c) => {
+  const t = await c.env.DB.prepare(`SELECT * FROM tasks WHERE id=? AND enterprise_id=?`).bind(c.req.param('id'), entId(c)).first<any>()
+  if (!t) return c.json({ error: '任务不存在' }, 404)
+  if (t.risk_level === 'red') return c.json({ error: '红色任务禁止发布，请修改计价方式与描述' }, 422)
+  await c.env.DB.prepare(`UPDATE tasks SET status=? WHERE id=?`).bind(t.risk_level === 'yellow' ? 'review' : 'published', t.id).run()
+  await audit(c.env.DB, c.get('user'), 'PUBLISH_TASK', `task:${t.id}`)
+  return c.json({ ok: true })
+})
 ent.get('/tasks/:id/orders', async (c) => {
   const rows = await c.env.DB.prepare(`SELECT o.*, w.name worker_name, w.verified FROM task_orders o JOIN workers w ON w.id=o.worker_id JOIN tasks t ON t.id=o.task_id WHERE o.task_id=? AND t.enterprise_id=? ORDER BY o.id`).bind(c.req.param('id'), entId(c)).all()
   return c.json(rows.results)
@@ -429,6 +437,56 @@ ent.get('/cost-compare', async (c) => {
 
 ent.get('/audit-logs', async (c) => {
   const rows = await c.env.DB.prepare(`SELECT * FROM audit_logs WHERE user_id IN (SELECT id FROM users WHERE enterprise_id=?) OR role='system' ORDER BY id DESC LIMIT 50`).bind(entId(c)).all()
+  return c.json(rows.results)
+})
+
+// ---------------- 经营报表 ----------------
+ent.get('/reports/summary', async (c) => {
+  const eid = entId(c), db = c.env.DB
+  const year = (c.req.query('year') || new Date().getFullYear().toString())
+  const payroll = (await db.prepare(`SELECT period, layer, SUM(total_gross) gross, SUM(total_tax) tax, SUM(total_employer_insurance) ins, SUM(total_employer_cost) cost, SUM(headcount) hc FROM payroll_batches WHERE enterprise_id=? AND period LIKE ? AND status='paid' GROUP BY period, layer ORDER BY period`).bind(eid, `${year}-%`).all()).results
+  const settle = (await db.prepare(`SELECT period, COUNT(*) n, SUM(amount) amt, SUM(service_fee) fee, SUM(iit) iit, SUM(vat+surcharge) vat FROM settlements WHERE enterprise_id=? AND period LIKE ? GROUP BY period ORDER BY period`).bind(eid, `${year}-%`).all()).results
+  const tasks = (await db.prepare(`SELECT status, COUNT(*) n, SUM(budget) budget FROM tasks WHERE enterprise_id=? GROUP BY status`).bind(eid).all()).results
+  const risk = (await db.prepare(`SELECT risk_level, COUNT(*) n FROM tasks WHERE enterprise_id=? GROUP BY risk_level`).bind(eid).all()).results
+  const dept = (await db.prepare(`SELECT COALESCE(department,'未分配') d, layer, COUNT(*) n, SUM(base_salary) salary FROM employees WHERE enterprise_id=? AND status='active' GROUP BY d, layer`).bind(eid).all()).results
+  const ai = (await db.prepare(`SELECT strftime('%Y-%m',created_at) period, COUNT(*) n, SUM(credits) credits FROM ai_usage WHERE owner_type='enterprise' AND owner_id=? GROUP BY period ORDER BY period`).bind(eid).all()).results
+  const e = await db.prepare(`SELECT taxpayer_type, service_rate FROM enterprises WHERE id=?`).bind(eid).first<any>()
+  const totalPayout = settle.reduce((s: number, x: any) => s + x.amt, 0)
+  const cmp = enterpriseCostCompare(totalPayout || 1, e.taxpayer_type, e.service_rate)
+  return c.json({ year, payroll, settle, tasks, risk, dept, ai, saving: { payout: totalPayout, vs_legacy: r2(cmp.options[1].net - cmp.options[2].net), vs_direct: r2(cmp.options[0].net - cmp.options[2].net) } })
+})
+ent.get('/reports/export/:type', async (c) => {
+  const eid = entId(c), db = c.env.DB, type = c.req.param('type'), period = c.req.query('period') || nowPeriod()
+  let rows: any[] = [], cols: string[] = []
+  if (type === 'payroll') { rows = (await db.prepare(`SELECT pb.period, pb.layer, pi.employee_name, pi.gross, pi.bonus, pi.personal_insurance, pi.personal_housing, pi.employer_insurance, pi.employer_housing, pi.special_deduction, pi.cum_taxable, pi.tax, pi.vat, pi.service_fee, pi.net, pi.employer_cost FROM payroll_items pi JOIN payroll_batches pb ON pb.id=pi.batch_id WHERE pb.enterprise_id=? AND pb.period=?`).bind(eid, period).all()).results; cols = ['期间', '层级', '姓名', '应发', '奖金', '个人社保', '个人公积金', '单位社保', '单位公积金', '专项附加', '累计应纳税所得', '个税', '增值税', '服务费', '实发', '企业成本'] }
+  else if (type === 'settlements') { rows = (await db.prepare(`SELECT s.settlement_no, s.period, w.name, s.amount, s.service_fee, s.iit, s.vat, s.surcharge, s.net, s.cum_income, s.status FROM settlements s JOIN workers w ON w.id=s.worker_id WHERE s.enterprise_id=? AND s.period=?`).bind(eid, period).all()).results; cols = ['结算单号', '期间', '从业人员', '结算额', '服务费', '预扣个税', '增值税', '附加', '实到手', '累计收入', '状态'] }
+  else if (type === 'employees') { rows = (await db.prepare(`SELECT name, id_no, phone, layer, employment_type, position, department, base_salary, hourly_rate, social_base, housing_base, special_deduction, start_date, status FROM employees WHERE enterprise_id=?`).bind(eid).all()).results; cols = ['姓名', '身份证', '手机', '层级', '用工形态', '岗位', '部门', '月薪', '时薪', '社保基数', '公积金基数', '专项附加', '入职日期', '状态'] }
+  else return c.json({ error: '未知类型' }, 400)
+  const csv = '\ufeff' + [cols.join(','), ...rows.map(r => Object.values(r).map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))].join('\n')
+  return new Response(csv, { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${type}_${period}.csv"` } })
+})
+/** 批量导入人员（JSON 行数组，前端解析 CSV） */
+ent.post('/employees/import', async (c) => {
+  const eid = entId(c)
+  const { rows } = await c.req.json<any>()
+  if (!Array.isArray(rows)) return c.json({ error: '格式错误' }, 400)
+  let ok = 0, skipped: string[] = []
+  for (const r of rows.slice(0, 500)) {
+    if (!r.name || !r.layer) { skipped.push(r.name || '?'); continue }
+    if (r.layer === 'task' && r.id_no) {
+      const dup = await c.env.DB.prepare(`SELECT id FROM employees WHERE enterprise_id=? AND id_no=? AND layer IN ('core','flex') AND status='active'`).bind(eid, r.id_no).first()
+      if (dup) { skipped.push(`${r.name}（老员工转灵工拦截）`); continue }
+    }
+    await c.env.DB.prepare(`INSERT INTO employees (enterprise_id,name,id_no,phone,layer,employment_type,position,department,base_salary,hourly_rate,social_base,housing_base,special_deduction,start_date) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(eid, r.name, r.id_no || null, r.phone || null, r.layer, r.employment_type || { core: 'fulltime', flex: 'parttime', task: 'platform' }[r.layer], r.position || null, r.department || null, +r.base_salary || 0, +r.hourly_rate || 0, +r.social_base || +r.base_salary || 0, +r.housing_base || +r.base_salary || 0, +r.special_deduction || 0, r.start_date || null).run()
+    ok++
+  }
+  await audit(c.env.DB, c.get('user'), 'IMPORT_EMPLOYEES', `enterprise:${eid}`, `导入 ${ok} 人，跳过 ${skipped.length}`)
+  return c.json({ ok, skipped })
+})
+/** 通知 */
+ent.get('/notifications', async (c) => {
+  const eid = entId(c)
+  const rows = await c.env.DB.prepare(`SELECT * FROM notifications WHERE (enterprise_id=? OR (role='enterprise' AND enterprise_id IS NULL)) ORDER BY id DESC LIMIT 30`).bind(eid).all()
   return c.json(rows.results)
 })
 

@@ -86,21 +86,72 @@ export function estimateTokens(text: string) {
 }
 export const creditsFor = (m: ModelRow, tin: number, tout: number) => r2((tin / 1000) * m.price_in + (tout / 1000) * m.price_out)
 
+export interface Provider { key?: string; base_url: string; api_key: string | null; status: string; protocol?: string; env_var?: string | null }
+
+/** 解析供应商的有效配置：DB 保存的 Key 优先，其次环境变量（.dev.vars / wrangler secret）。disabled 永不可用 */
+export function resolveProvider(p: Provider, env: Record<string, any> = {}): Provider & { live: boolean; source: 'db' | 'env' | 'none' } {
+  if (p.status === 'disabled') return { ...p, live: false, source: 'none' }
+  if (p.api_key) return { ...p, live: true, source: 'db' }
+  const envKey = p.env_var ? env[p.env_var] : null
+  const envBase = p.env_var ? env[p.env_var.replace(/_API_KEY$/, '_BASE_URL')] : null
+  if (envKey) return { ...p, api_key: envKey, base_url: envBase || p.base_url, live: true, source: 'env' }
+  return { ...p, live: false, source: 'none' }
+}
+
+/** 不同上游的参数兼容：GPT-5 系列不支持 temperature / max_tokens */
+function buildBody(model: string, messages: Msg[], opts: { temperature?: number; max_tokens?: number; stream?: boolean }) {
+  const body: any = { model, messages, stream: !!opts.stream }
+  if (/^gpt-5/.test(model) || /^o\d/.test(model)) { body.max_completion_tokens = opts.max_tokens ?? 4096 }
+  else { body.temperature = opts.temperature ?? 0.7; body.max_tokens = opts.max_tokens ?? 2048 }
+  return body
+}
+
 /** L4 调用供应商（OpenAI 兼容）；无 Key 时返回 mock */
-export async function callChat(provider: { base_url: string; api_key: string | null; status: string; protocol: string }, model: string, messages: Msg[], opts: { temperature?: number; max_tokens?: number } = {}) {
+export async function callChat(provider: Provider & { live?: boolean }, model: string, messages: Msg[], opts: { temperature?: number; max_tokens?: number } = {}) {
   const t0 = Date.now()
-  if (provider.status !== 'active' || !provider.api_key) {
+  const live = provider.live ?? (provider.status === 'active' && !!provider.api_key)
+  if (!live || !provider.api_key) {
     const content = mockAnswer(messages)
     return { content, tokens_in: estimateTokens(messages.map(m => m.content).join('\n')), tokens_out: estimateTokens(content), latency_ms: Date.now() - t0 + 350, mock: true }
   }
   const res = await fetch(`${provider.base_url.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.api_key}` },
-    body: JSON.stringify({ model, messages, temperature: opts.temperature ?? 0.7, max_tokens: opts.max_tokens ?? 2048, stream: false }),
+    body: JSON.stringify(buildBody(model, messages, { ...opts, stream: false })),
   })
   if (!res.ok) { const t = await res.text(); throw new Error(`网关上游错误 ${res.status}: ${t.slice(0, 200)}`) }
   const j: any = await res.json()
   const content = j.choices?.[0]?.message?.content || ''
   return { content, tokens_in: j.usage?.prompt_tokens || estimateTokens(messages.map(m => m.content).join('\n')), tokens_out: j.usage?.completion_tokens || estimateTokens(content), latency_ms: Date.now() - t0, mock: false }
+}
+
+/** L4 流式调用：返回文本片段的异步迭代器；结束后 usage 可从 result 读取 */
+export async function* streamChat(provider: Provider & { live?: boolean }, model: string, messages: Msg[], opts: { temperature?: number; max_tokens?: number } = {}): AsyncGenerator<{ delta?: string; done?: boolean; tokens_in?: number; tokens_out?: number; mock?: boolean }> {
+  const live = provider.live ?? (provider.status === 'active' && !!provider.api_key)
+  if (!live || !provider.api_key) {
+    const content = mockAnswer(messages)
+    // 模拟打字机
+    for (let i = 0; i < content.length; i += 24) { yield { delta: content.slice(i, i + 24) }; await new Promise(r => setTimeout(r, 12)) }
+    yield { done: true, tokens_in: estimateTokens(messages.map(m => m.content).join('\n')), tokens_out: estimateTokens(content), mock: true }
+    return
+  }
+  const res = await fetch(`${provider.base_url.replace(/\/$/, '')}/chat/completions`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.api_key}` },
+    body: JSON.stringify({ ...buildBody(model, messages, { ...opts, stream: true }), stream_options: { include_usage: true } }),
+  })
+  if (!res.ok || !res.body) { const t = await res.text().catch(() => ''); throw new Error(`网关上游错误 ${res.status}: ${t.slice(0, 200)}`) }
+  const reader = res.body.getReader(); const dec = new TextDecoder()
+  let buf = '', outText = '', usage: any = null
+  while (true) {
+    const { value, done } = await reader.read(); if (done) break
+    buf += dec.decode(value, { stream: true })
+    const lines = buf.split('\n'); buf = lines.pop() || ''
+    for (const line of lines) {
+      const l = line.trim(); if (!l.startsWith('data:')) continue
+      const data = l.slice(5).trim(); if (data === '[DONE]') continue
+      try { const j = JSON.parse(data); const d = j.choices?.[0]?.delta?.content; if (d) { outText += d; yield { delta: d } } if (j.usage) usage = j.usage } catch { }
+    }
+  }
+  yield { done: true, tokens_in: usage?.prompt_tokens || estimateTokens(messages.map(m => m.content).join('\n')), tokens_out: usage?.completion_tokens || estimateTokens(outText), mock: false }
 }
 
 export async function callImage(provider: { base_url: string; api_key: string | null; status: string }, model: string, prompt: string, size = '1024x1024') {
@@ -112,10 +163,13 @@ export async function callImage(provider: { base_url: string; api_key: string | 
 }
 
 /** 健康检查：GET /models */
-export async function checkProvider(provider: { base_url: string; api_key: string | null }) {
+export async function checkProvider(provider: Provider & { live?: boolean }, model?: string) {
   try {
-    const res = await fetch(`${provider.base_url.replace(/\/$/, '')}/models`, { headers: provider.api_key ? { Authorization: `Bearer ${provider.api_key}` } : {} })
-    return { ok: res.ok, status: res.status }
+    if (!provider.api_key) return { ok: false, status: 0, error: '未配置 API Key' }
+    // 用一次最小对话做真实连通性测试（部分网关不开放 /models）
+    const res = await fetch(`${provider.base_url.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.api_key}` }, body: JSON.stringify(buildBody(model || 'deepseek-chat', [{ role: 'user', content: 'ping' }], { max_tokens: 5 })) })
+    const txt = await res.text()
+    return { ok: res.ok, status: res.status, error: res.ok ? undefined : txt.slice(0, 160) }
   } catch (e: any) { return { ok: false, status: 0, error: e.message } }
 }
 
