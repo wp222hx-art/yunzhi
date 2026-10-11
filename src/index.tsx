@@ -9,6 +9,8 @@ import opcRoutes from './routes/opc'
 import adminRoutes from './routes/admin'
 import workerRoutes from './routes/worker'
 import guideRoutes from './routes/guide'
+import aiRoutes, { aiAdmin } from './routes/ai'
+import { runDlp, dlpOutput, routeModel, callChat, creditsFor, evidenceHash, type ModelRow, type DlpRule } from './lib/gateway'
 import { laborCumulative, laborLegacy, vatAgent, opcCompare, enterpriseCostCompare, wageCumulative, socialInsurance, DEFAULT_SOCIAL, r2 } from './lib/tax'
 import { scoreLaborRisk } from './lib/risk'
 import { landingPage, loginPage, appShell, guidePage } from './pages'
@@ -25,6 +27,42 @@ app.route('/api/opc', opcRoutes)
 app.route('/api/admin', adminRoutes)
 app.route('/api/worker', workerRoutes)
 app.route('/api/guide', guideRoutes)
+app.route('/api/ai', aiRoutes)
+app.route('/api/admin/ai', aiAdmin)
+
+// ---------- 对外 OpenAI 兼容网关：企业用自己的子密钥调用（L1 统一接入） ----------
+app.get('/v1/models', async (c) => {
+  const rows = await c.env.DB.prepare(`SELECT model_id id, vendor owned_by, type, pool FROM ai_models WHERE status='active'`).all()
+  return c.json({ object: 'list', data: rows.results.map((m: any) => ({ ...m, object: 'model' })) })
+})
+app.post('/v1/chat/completions', async (c) => {
+  const auth = c.req.header('Authorization') || ''
+  const key = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+  const w = key ? await c.env.DB.prepare(`SELECT * FROM ai_wallets WHERE api_key=?`).bind(key).first<any>() : null
+  if (!w) return c.json({ error: { message: 'Invalid API key', type: 'invalid_request_error' } }, 401)
+  if (w.credits <= 0) return c.json({ error: { message: '配额不足', type: 'insufficient_quota' } }, 402)
+  const b = await c.req.json<any>()
+  const messages = b.messages || []
+  const rules = (await c.env.DB.prepare(`SELECT * FROM dlp_rules WHERE enabled=1`).all<DlpRule>()).results
+  const last = [...messages].reverse().find((m: any) => m.role === 'user') || { content: '' }
+  const dlp = runDlp(String(last.content || ''), rules, w.dlp_level)
+  if (dlp.action === 'block') return c.json({ error: { message: `DLP blocked: ${dlp.hits.map(h => h.name).join(',')}`, type: 'dlp_blocked' } }, 400)
+  const models = (await c.env.DB.prepare(`SELECT * FROM ai_models WHERE status='active'`).all<ModelRow>()).results
+  const route = routeModel(models, { type: 'chat', policy: w.routing_policy, poolPolicy: w.pool_policy, forceDomestic: dlp.forceDomestic, preferred: b.model && b.model !== 'auto' ? b.model : undefined })
+  if (!route) return c.json({ error: { message: 'no model available' } }, 503)
+  const provider = await c.env.DB.prepare(`SELECT * FROM ai_providers WHERE key=?`).bind(route.model.provider_key).first<any>()
+  const sanitized = messages.map((m: any) => m === last ? { ...m, content: dlp.text } : m)
+  const t0 = Date.now()
+  const out = await callChat(provider, route.model.model_id, sanitized, { temperature: b.temperature, max_tokens: b.max_tokens })
+  const content = dlpOutput(out.content, rules, w.dlp_level)
+  const credits = creditsFor(route.model, out.tokens_in, out.tokens_out)
+  const h = await evidenceHash([w.id, 'v1', route.model.model_id, out.tokens_in, out.tokens_out, t0])
+  await c.env.DB.batch([
+    c.env.DB.prepare(`UPDATE ai_wallets SET credits=credits-?, total_spent=total_spent+? WHERE id=?`).bind(credits, credits, w.id),
+    c.env.DB.prepare(`INSERT INTO ai_usage (wallet_id,owner_type,owner_id,user_name,agent_key,model_id,provider_key,pool,route_reason,tokens_in,tokens_out,credits,latency_ms,dlp_action,dlp_hits,status,evidence_hash) VALUES (?,?,?,?,'api',?,?,?,?,?,?,?,?,?,?,?,?)`).bind(w.id, w.owner_type, w.owner_id, 'API', route.model.model_id, route.model.provider_key, route.model.pool, route.reason, out.tokens_in, out.tokens_out, credits, out.latency_ms, dlp.action, JSON.stringify(dlp.hits), out.mock ? 'mock' : 'ok', h),
+  ])
+  return c.json({ id: 'chatcmpl-' + h.slice(0, 24), object: 'chat.completion', created: Math.floor(t0 / 1000), model: route.model.model_id, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: out.tokens_in, completion_tokens: out.tokens_out, total_tokens: out.tokens_in + out.tokens_out }, x_gateway: { pool: route.model.pool, route_reason: route.reason, dlp_action: dlp.action, credits, evidence_hash: h, mock: out.mock } })
+})
 
 // 公共测算器（门户免费工具 · PLG 入口）
 app.get('/api/public/health', (c) => c.json({ ok: true, name: '云工智合佳 Compliance OS', policy_baseline: '2026-10-09' }))

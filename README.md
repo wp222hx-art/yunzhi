@@ -1,5 +1,7 @@
 # 云工智合佳 · AI 合规用工操作系统（Compliance OS）
 
+> 合规 × AI 赋能 × 算力 · 三位一体的企业操作系统
+
 > 用工有弹性，合规有确定性。让每一笔灵活用工都**可证明、可审计、可扣除**；让每一位灵活就业者都**合法增收、可持续成长**。
 
 基于《云工智合佳 · 可行性风险与落地策划全案》（政策基准日 2026-10-09）完成的前后台一体化平台 MVP。
@@ -84,6 +86,26 @@
 - 任务大厅申请接单 → 企业确认后自动签约；我的任务自助交付（哈希存证）
 - 收入与凭证、我的税负（累计预扣 vs 传统劳务逐月预测）、成长路径
 
+### 6️⃣ 企业 AI 赋能中心（企业 / OPC / 从业人员共用）
+- **AI 数字员工矩阵（15 个 Agent）**：用工合规诊断官 · 任务拆解定价师 · 智能合同 · 税负解读官 · OPC 成长教练 · AI 销售宝 · 电商文案官 · AIGC 工坊 · 智能客服 · 经营分析师 · 人事助理 · 财务助理 · 轻站搭建 · 政策补贴匹配 · 路演 BP 教练
+  - 涉税 Agent 标记 `deterministic`：规则引擎先算，模型只解释（三不原则）
+  - 每次调用：L2 DLP 输入 → L3 智能路由 → L4 调用 → L2 DLP 输出 → L5 计费 + 存证
+- **AIGC 工坊**：文生图 / 文生视频，自动添加 AI 生成标识
+- **算力中心**：算力钱包（Credits，1 Cr = ¥0.01）、充值返 Token 10-15%、四档订阅（Free/Basic/Pro/Enterprise）、网关配置（路由策略 / 资源池 / DLP 级别 / BYOK）、OpenAI 兼容子密钥、60+ 模型目录与定价、DLP 八大模块测试、账单与调用审计
+- **AI 服务集市（八大能力模块）**：任务中心（即任务与交付）· 算力中心 · 项目超市 · 服务集市（Skill/MCP/Agent）· AI 人才 · 特色专区 · 政策政府 · 投融路演，另有轻站 / 托盘赋能
+- **对外 OpenAI 兼容网关** `POST /v1/chat/completions`、`GET /v1/models`：企业用子密钥把自有系统接入，`model:"auto"` 走智能路由，响应含 `x_gateway{pool,route_reason,dlp_action,credits,evidence_hash}`
+
+### 7️⃣ 算力网关（平台后台 · 五层架构）
+| 层 | 能力 | 实现 |
+|---|---|---|
+| L1 统一接入 | OpenAI 兼容 · 子密钥 · BYOK | `/v1/*`、`ai_wallets.api_key / byok_json` |
+| L2 DLP 网关 | 八大模块：全报文解析 / 双引擎识别(PII) / 流式检测 / 分级处置(放行·脱敏·阻断·分流) / 双向防护 / 提示词注入防护 / 风险路由 / 全链路审计 | `src/lib/gateway.ts runDlp/dlpOutput`，规则表 `dlp_rules` |
+| L3 聚合分发 | 质量 / 均衡 / 成本 / 时延四种策略打分；敏感业务强制境内 | `routeModel` |
+| L4 资源适配 | 境内备案池 + 海外可控池；多供应商优先级；连通性检查 | `ai_providers / ai_models` |
+| L5 运营合规 | Token 计量计费、返 Token、订单、SHA-256 存证哈希 | `ai_usage / ai_wallet_txns` |
+
+**接入真实算力**：平台后台 → 算力网关 → 在「算力网 · 统一算力网关」卡片填入上游 API Key（Base URL 默认 `https://api.suanli.com/v1`）→ 状态改为"已启用"→ 保存。未配置时为演示模式（链路完整、输出为结构化示例并明确标注）。
+
 ### 平台后台其他能力
 风控中心（评估记录、人工放行/拦截、T+0 异常监测：一人多号、经济从属、起征点、实名、OPC集中度、AI 评分沙盒）、企业入驻与费率/风险等级管理、从业人员实名核验、OPC 管理、政策法规库（9 条，附文号与生效日期）、规则引擎参数化配置、审计日志。
 
@@ -104,6 +126,9 @@
 | `GET/POST /api/admin/collection/agreements` `GET /collection/records|summary` `POST /collection/certify/:period` | 委托代征 |
 | `GET /api/admin/risk/assessments|monitor` `POST /risk/assess` `POST /risk/tasks/:id/decision` | 风控 |
 | `GET/POST/PUT /api/admin/enterprises` `GET/POST /workers` `POST /workers/:id/verify` `GET /opcs` `GET /policies` `GET/PUT /settings` `GET /audit-logs` | 平台管理 |
+| `GET /api/ai/overview|wallet|models|agents|usage|catalog|orders|conversations` `POST /ai/chat|image|route/preview|dlp/test|wallet/recharge|wallet/plan|wallet/rotate-key|catalog/:id/order` `PUT /ai/wallet/settings` | AI 赋能中心 |
+| `GET/PUT /api/admin/ai/providers|models|dlp/rules|agents|catalog|orders` `POST /admin/ai/providers/:key/check` `GET /admin/ai/stats` | 算力网关管理 |
+| `POST /v1/chat/completions` `GET /v1/models` | 对外 OpenAI 兼容网关 |
 | `GET /api/worker/home|hall|income|tax` `POST /worker/verify` `POST /worker/hall/:id/apply` `POST /worker/orders/:id/deliver` | 从业人员端 |
 | `GET /api/guide/progress` `GET /api/guide/todos` | 流程进度与角色待办 |
 | `GET/POST /api/enterprise/applications[/:id/decide]` `POST /enterprise/demo/run-flow` | 接单申请确认 · 一键演示 |
@@ -113,7 +138,7 @@
 
 `users(含 worker 角色与 onboarded) / sessions / task_applications / enterprises / employees / payroll_batches / payroll_items / workers / tasks / task_orders / settlements / tax_filings / collection_agreements / collection_records / opcs / opc_incomes / opc_expenses / opc_payrolls / risk_assessments / audit_logs / policies / platform_settings`
 
-迁移文件：`migrations/0001_initial_schema.sql`、`0002_worker_role.sql`；演示数据：`seed.sql`
+迁移文件：`migrations/0001_initial_schema.sql`、`0002_worker_role.sql`、`0003_ai_center.sql`；AI 种子：`seed_ai.sql`；演示数据：`seed.sql`
 
 ## 规则引擎（`src/lib/tax.ts` / `src/lib/risk.ts`）
 
@@ -129,7 +154,7 @@
 ```bash
 npm install
 npm run build
-npm run db:migrate:local && npm run db:seed    # 初始化本地 D1
+npm run db:migrate:local && npm run db:seed && npx wrangler d1 execute webapp-production --local --file=./seed_ai.sql
 pm2 start ecosystem.config.cjs                 # 或 npm run dev:sandbox
 curl http://localhost:3000/api/public/health
 ```
@@ -137,7 +162,7 @@ curl http://localhost:3000/api/public/health
 ## 尚未实现 / 下一步建议
 
 1. **真实外部对接**：持牌支付机构受托分账 API、电子签/司法存证、公安三要素+人脸活体、电子税务局申报接口（当前为流程模拟）
-2. **大模型 Agent 层**：接入已备案大模型网关 + RAG 法规库，补齐"用工合规诊断 / 任务拆解定价 / 智能合同 / 交付验收 / OPC 成长"Agent（当前风控为专家规则评分卡）
+2. **算力网关真实接入**：填入上游 API Key 即可；后续补流式 SSE 输出、视频异步任务轮询、Embedding/RAG 法规库、MCP 工具调用
 3. 社保公积金地区参数库、专项附加扣除明细申报、年度汇算提醒
 4. 渠道合伙人分级与分佣结算、企业合规 SaaS 订阅计费
 5. 等保三级、数据分级分类、人脸特征值加密存储、PIPL 单独同意流程

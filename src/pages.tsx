@@ -19,6 +19,7 @@ export function landingPage() {
     <a href="/" class="flex items-center gap-2 font-bold text-lg"><span class="w-9 h-9 rounded-xl bg-brand-600 text-white grid place-items-center"><i class="fas fa-shield-halved"></i></span>云工智合佳<span class="text-xs font-normal text-slate-400 ml-1">CloudWork Intel</span></a>
     <div class="hidden md:flex items-center gap-8 text-sm text-slate-600">
       <a href="#solutions" class="hover:text-brand-600">解决方案</a>
+      <a href="#ai" class="hover:text-brand-600">AI 赋能</a>
       <a href="#engine" class="hover:text-brand-600">合规引擎</a>
       <a href="#calc" class="hover:text-brand-600">免费测算</a>
       <a href="#opc" class="hover:text-brand-600">OPC经营舱</a>
@@ -89,6 +90,20 @@ export function landingPage() {
         <h3 class="mt-5 font-bold">${t}</h3><p class="mt-2 text-sm text-slate-600 leading-relaxed">${d}</p>
         <div class="mt-4 text-sm text-brand-600 group-hover:translate-x-1 transition">进入系统 <i class="fas fa-arrow-right"></i></div>
       </a>`).join('')}
+    </div>
+  </div>
+</section>
+
+<section id="ai" class="bg-ink text-white py-20">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="text-center"><span class="text-xs bg-white/10 px-3 py-1 rounded-full">合规 × AI × 算力 · 三位一体</span><h2 class="text-3xl font-bold mt-4">企业 AI 赋能工具箱</h2><p class="text-slate-400 mt-2">让 AI 算力成为企业增长的新水电：一个入口，调用国内外 60+ 大模型；八大能力模块，覆盖从算力到政策与资本。</p></div>
+    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mt-10">
+      ${[['fa-list-check', '任务中心', '需求发布、接单、交付、验收一站式管理，合规结算'], ['fa-microchip', '算力中心', '境内备案池 + 海外可控池，智能路由，Token 统一结算'], ['fa-boxes-stacked', '项目超市', '标准化 AI 项目模板，快速复制落地'], ['fa-store', '服务集市', 'Skill · MCP · Agent，开发者上架，企业直接调用'], ['fa-users-gear', 'AI 人才', '连接企业与 AI 工程师、运营专家，合规结算'], ['fa-layer-group', '特色专区', '直播电商 / 数据标注 / 教育 / 软件众包行业方案'], ['fa-landmark', '政策政府', '产业政策、算力券、OPC 扶持匹配与申报'], ['fa-chart-line', '投融路演', '项目展示、BP 辅导、投融资对接']].map(([i, t, d]) => `<div class="rounded-2xl bg-white/5 border border-white/10 p-5 hover:bg-white/10 transition"><i class="fas ${i} text-brand-300 text-xl"></i><div class="font-bold mt-3">${t}</div><div class="text-sm text-slate-400 mt-1">${d}</div></div>`).join('')}
+    </div>
+    <div class="grid lg:grid-cols-3 gap-6 mt-10">
+      <div class="rounded-2xl bg-gradient-to-br from-brand-600 to-indigo-700 p-6"><div class="text-sm text-brand-100">数字员工矩阵</div><div class="text-2xl font-bold mt-1">15 个开箱即用 AI Agent</div><div class="text-sm text-brand-100 mt-3">用工合规诊断官 · 任务拆解定价师 · 智能合同 · 税负解读 · AI 销售宝 · 电商文案官 · AIGC 工坊 · 智能客服 · 经营分析 · 人事助理 · 财务助理 · 轻站搭建 · 政策匹配 · 路演教练 · OPC 教练</div></div>
+      <div class="rounded-2xl bg-white/5 border border-white/10 p-6"><div class="text-sm text-slate-400">算力网关 · 五层架构</div><div class="mt-3 space-y-2 text-sm">${[['L1', '统一接入 · OpenAI 兼容 · BYOK'], ['L2', 'DLP 网关 · 八大模块 · 300ms 分级处置'], ['L3', '聚合分发 · 智能风险路由'], ['L4', '境内备案池 + 海外可控池'], ['L5', '计费 · 合规报告 · 全链路存证']].map(([l, t]) => `<div class="flex gap-3"><span class="w-8 text-brand-300 font-mono">${l}</span><span class="text-slate-300">${t}</span></div>`).join('')}</div></div>
+      <div class="rounded-2xl bg-white/5 border border-white/10 p-6"><div class="text-sm text-slate-400">Token 计费 · 透明可追溯</div><div class="grid grid-cols-2 gap-3 mt-3 text-center"><div class="bg-white/5 rounded-xl p-3"><div class="text-2xl font-bold">60+</div><div class="text-xs text-slate-400">接入大模型</div></div><div class="bg-white/5 rounded-xl p-3"><div class="text-2xl font-bold">1 Key</div><div class="text-xs text-slate-400">一次接入全部调用</div></div><div class="bg-white/5 rounded-xl p-3"><div class="text-2xl font-bold">15%</div><div class="text-xs text-slate-400">消费返 Token</div></div><div class="bg-white/5 rounded-xl p-3"><div class="text-2xl font-bold">¥99</div><div class="text-xs text-slate-400">起步套餐</div></div></div><a href="/login" class="block mt-4 text-center bg-white text-ink rounded-xl py-2 text-sm font-medium">免费注册送 1,000 Credits</a></div>
     </div>
   </div>
 </section>
@@ -271,10 +286,10 @@ export function guidePage() {
 }
 
 const NAVS: Record<string, Array<[string, string, string]>> = {
-  admin: [['dashboard', 'fa-gauge-high', '平台总览'], ['filings', 'fa-file-signature', '合规申报中心'], ['collection', 'fa-landmark', '委托代征'], ['risk', 'fa-shield-halved', '风控中心'], ['enterprises', 'fa-building', '企业管理'], ['workers', 'fa-users', '从业人员'], ['opcs', 'fa-rocket', 'OPC管理'], ['policies', 'fa-book', '政策法规库'], ['settings', 'fa-sliders', '规则参数'], ['logs', 'fa-clock-rotate-left', '审计日志']],
-  enterprise: [['dashboard', 'fa-gauge-high', '用工驾驶舱'], ['employees', 'fa-sitemap', '三层用工结构'], ['payroll', 'fa-money-check-dollar', '薪酬管理'], ['tasks', 'fa-list-check', '任务与交付'], ['settlements', 'fa-file-shield', '结算与凭证包'], ['compare', 'fa-scale-balanced', '成本对比'], ['logs', 'fa-clock-rotate-left', '操作日志']],
-  opc: [['dashboard', 'fa-gauge-high', '经营舱'], ['income', 'fa-sack-dollar', '收入与成本'], ['payroll', 'fa-wallet', 'OPC薪酬'], ['tax', 'fa-receipt', '税务测算'], ['growth', 'fa-stairs', '三阶跃迁'], ['cabin', 'fa-box-open', '一站式服务']],
-  worker: [['home', 'fa-house', '我的首页'], ['hall', 'fa-store', '任务大厅'], ['orders', 'fa-list-check', '我的任务'], ['income', 'fa-wallet', '收入与凭证'], ['tax', 'fa-receipt', '我的税负'], ['growth', 'fa-stairs', '成长路径']],
+  admin: [['dashboard', 'fa-gauge-high', '平台总览'], ['filings', 'fa-file-signature', '合规申报中心'], ['collection', 'fa-landmark', '委托代征'], ['risk', 'fa-shield-halved', '风控中心'], ['gateway', 'fa-microchip', '算力网关'], ['aiops', 'fa-robot', 'AI 运营'], ['enterprises', 'fa-building', '企业管理'], ['workers', 'fa-users', '从业人员'], ['opcs', 'fa-rocket', 'OPC管理'], ['policies', 'fa-book', '政策法规库'], ['settings', 'fa-sliders', '规则参数'], ['logs', 'fa-clock-rotate-left', '审计日志']],
+  enterprise: [['dashboard', 'fa-gauge-high', '用工驾驶舱'], ['employees', 'fa-sitemap', '三层用工结构'], ['payroll', 'fa-money-check-dollar', '薪酬管理'], ['tasks', 'fa-list-check', '任务与交付'], ['settlements', 'fa-file-shield', '结算与凭证包'], ['compare', 'fa-scale-balanced', '成本对比'], ['__ai', '', 'AI 赋能'], ['ai', 'fa-robot', 'AI 数字员工'], ['aistudio', 'fa-wand-magic-sparkles', 'AIGC 工坊'], ['compute', 'fa-microchip', '算力中心'], ['market', 'fa-store', 'AI 服务集市'], ['logs', 'fa-clock-rotate-left', '操作日志']],
+  opc: [['dashboard', 'fa-gauge-high', '经营舱'], ['income', 'fa-sack-dollar', '收入与成本'], ['payroll', 'fa-wallet', 'OPC薪酬'], ['tax', 'fa-receipt', '税务测算'], ['growth', 'fa-stairs', '三阶跃迁'], ['cabin', 'fa-box-open', '一站式服务'], ['__ai', '', 'AI 赋能'], ['ai', 'fa-robot', 'AI 数字员工'], ['aistudio', 'fa-wand-magic-sparkles', 'AIGC 工坊'], ['compute', 'fa-microchip', '算力中心'], ['market', 'fa-store', 'AI 服务集市']],
+  worker: [['home', 'fa-house', '我的首页'], ['hall', 'fa-store', '任务大厅'], ['orders', 'fa-list-check', '我的任务'], ['income', 'fa-wallet', '收入与凭证'], ['tax', 'fa-receipt', '我的税负'], ['growth', 'fa-stairs', '成长路径'], ['__ai', '', 'AI 赋能'], ['ai', 'fa-robot', 'AI 助手'], ['market', 'fa-store', '技能与实训']],
 }
 const TITLES: Record<string, string> = { admin: '平台合规后台', enterprise: '企业用工管理', opc: 'OPC 一站式经营舱', worker: '灵活就业者工作台' }
 
@@ -287,7 +302,7 @@ export function appShell(role: 'admin' | 'enterprise' | 'opc' | 'worker', user: 
     <a href="/" class="h-16 flex items-center gap-2 px-5 font-bold text-white border-b border-white/10"><span class="w-8 h-8 rounded-lg bg-brand-600 grid place-items-center"><i class="fas fa-shield-halved"></i></span>云工智合佳</a>
     <div class="px-5 py-3 text-xs text-slate-500 uppercase tracking-wider">${TITLES[role]}</div>
     <nav id="side-nav" class="flex-1 px-3 space-y-1">
-      ${nav.map(([k, i, n]) => `<a href="#${k}" data-view="${k}" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-white/10"><i class="fas ${i} w-4"></i>${n}</a>`).join('')}
+      ${nav.map(([k, i, n]) => k.startsWith('__') ? `<div class="pt-3 pb-1 px-3 text-[10px] text-slate-500 uppercase tracking-wider">${n}</div>` : `<a href="#${k}" data-view="${k}" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-white/10"><i class="fas ${i} w-4"></i>${n}</a>`).join('')}
     </nav>
     <div class="p-4 border-t border-white/10 text-xs">
       <div class="text-white font-medium">${user.display_name}</div>
@@ -319,5 +334,6 @@ export function appShell(role: 'admin' | 'enterprise' | 'opc' | 'worker', user: 
 <script>window.__ROLE__='${role}';window.__USER__=${JSON.stringify(user)};</script>
 <script src="/static/common.js"></script>
 <script src="/static/${role}.js"></script>
+<script src="/static/ai.js"></script>
 </body></html>`
 }
