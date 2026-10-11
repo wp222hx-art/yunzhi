@@ -14,7 +14,7 @@ auth.post('/login', async (c) => {
   await c.env.DB.prepare(`INSERT INTO sessions (token,user_id,expires_at) VALUES (?,?,datetime('now','+12 hours'))`).bind(token, u.id).run()
   await audit(c.env.DB, u, 'LOGIN', `user:${u.id}`, '登录成功')
   c.header('Set-Cookie', `cw_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200`)
-  return c.json({ token, user: { id: u.id, username: u.username, role: u.role, display_name: u.display_name, enterprise_id: u.enterprise_id, opc_id: u.opc_id } })
+  return c.json({ token, user: { id: u.id, username: u.username, role: u.role, display_name: u.display_name, enterprise_id: u.enterprise_id, opc_id: u.opc_id, worker_id: u.worker_id, onboarded: u.onboarded } })
 })
 
 auth.post('/logout', async (c) => {
@@ -31,6 +31,13 @@ auth.get('/me', async (c) => {
   if (u.role === 'enterprise' && u.enterprise_id) extra.enterprise = await c.env.DB.prepare(`SELECT id,name,taxpayer_type,industry,region,service_rate,risk_level FROM enterprises WHERE id=?`).bind(u.enterprise_id).first()
   if (u.role === 'opc' && u.opc_id) extra.opc = await c.env.DB.prepare(`SELECT * FROM opcs WHERE id=?`).bind(u.opc_id).first()
   return c.json({ user: u, ...extra })
+})
+
+auth.post('/onboarded', async (c) => {
+  const u = await loadUser(c)
+  if (!u) return c.json({ error: '未登录' }, 401)
+  await c.env.DB.prepare(`UPDATE users SET onboarded=1 WHERE id=?`).bind(u.id).run()
+  return c.json({ ok: true })
 })
 
 export default auth

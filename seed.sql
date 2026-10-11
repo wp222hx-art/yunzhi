@@ -111,3 +111,7 @@ INSERT OR IGNORE INTO platform_settings (key,value,description) VALUES
 
 INSERT OR IGNORE INTO audit_logs (user_name,role,action,target,detail) VALUES
  ('系统','system','INIT','platform','平台初始化完成，加载演示数据');
+
+-- 从业人员演示账号
+INSERT OR IGNORE INTO users (id,username,password_hash,salt,role,display_name,worker_id) VALUES
+ (4,'worker_demo','29833f2d227de99528383c0f34a134830ea22c0c8ee6880cb0c31f27f5e1713a','s_worker_demo','worker','周小雨·数据标注员',2);

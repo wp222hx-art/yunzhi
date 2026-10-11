@@ -1,7 +1,7 @@
 import type { Context, Next } from 'hono'
 
 export type Bindings = { DB: D1Database }
-export type User = { id: number; username: string; role: 'admin' | 'enterprise' | 'opc'; display_name: string; enterprise_id: number | null; opc_id: number | null }
+export type User = { id: number; username: string; role: 'admin' | 'enterprise' | 'opc' | 'worker'; display_name: string; enterprise_id: number | null; opc_id: number | null; worker_id: number | null; onboarded: number }
 export type Env = { Bindings: Bindings; Variables: { user: User } }
 
 export async function sha256Hex(s: string) {
@@ -23,7 +23,7 @@ export async function loadUser(c: Context<Env>) {
   const token = getToken(c)
   if (!token) return null
   const row = await c.env.DB.prepare(
-    `SELECT u.id,u.username,u.role,u.display_name,u.enterprise_id,u.opc_id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now') AND u.status='active'`
+    `SELECT u.id,u.username,u.role,u.display_name,u.enterprise_id,u.opc_id,u.worker_id,u.onboarded FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now') AND u.status='active'`
   ).bind(token).first<User>()
   return row || null
 }

@@ -28,7 +28,22 @@ VIEWS.dashboard = async () => {
     ${card('交付与结算漏斗', `<div class="space-y-3 text-sm">${['signed', 'delivered', 'accepted', 'settled'].map(s => { const o = d.orders.find(x => x.status === s) || { n: 0, amt: 0 }; return `<div class="flex items-center justify-between"><span>${sbadge(s)}</span><span>${o.n}单 · ${money(o.amt)}</span></div>`; }).join('')}</div>
       <div class="mt-4 pt-4 border-t text-xs text-slate-500">任务：${d.tasks.map(t => `${STATUS[t.status]?.[1] || t.status} ${t.n}`).join(' · ')}</div>`)}
   </div>
+  <div class="mt-4 grid lg:grid-cols-3 gap-4">
+    <div class="lg:col-span-2 bg-gradient-to-r from-brand-600 to-indigo-600 text-white rounded-2xl p-6">
+      <div class="font-bold text-lg"><i class="fas fa-route mr-2"></i>每月这样用（3步）</div>
+      <div class="grid md:grid-cols-3 gap-4 mt-4 text-sm">
+        <div class="bg-white/10 rounded-xl p-4"><div class="text-2xl font-extrabold">1</div><div class="font-semibold mt-1">验收交付</div><div class="text-brand-100 text-xs mt-1">兼职交付后在「任务与交付」点验收，金额进入结算</div><a href="#tasks" class="inline-block mt-2 text-xs underline">去验收</a></div>
+        <div class="bg-white/10 rounded-xl p-4"><div class="text-2xl font-extrabold">2</div><div class="font-semibold mt-1">算薪发放</div><div class="text-brand-100 text-xs mt-1">「薪酬管理」三层各点一次：试算→生成→审批→发放</div><a href="#payroll" class="inline-block mt-2 text-xs underline">去发薪</a></div>
+        <div class="bg-white/10 rounded-xl p-4"><div class="text-2xl font-extrabold">3</div><div class="font-semibold mt-1">拿凭证</div><div class="text-brand-100 text-xs mt-1">发放后凭证包自动生成，申报由平台完成</div><a href="#settlements" class="inline-block mt-2 text-xs underline">看凭证</a></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl border border-dashed border-brand-300 p-6 flex flex-col justify-between">
+      <div><div class="font-bold"><i class="fas fa-wand-magic-sparkles text-brand-600 mr-2"></i>不想手动点？</div><div class="text-sm text-slate-500 mt-2">一键模拟"发布任务→从业人员签约→交付→验收"，然后您只需去「薪酬管理」发放任务层，就能看到完整链路。</div></div>
+      ${btn('<i class="fas fa-play mr-1"></i>一键跑通演示流程', 'primary', 'id="run-demo" class="mt-4 w-full"')}
+    </div>
+  </div>
   <div class="mt-4">${card('快捷操作', `<div class="flex flex-wrap gap-2">${btn('<i class="fas fa-plus mr-1"></i>新增人员', 'primary', 'onclick="location.hash=\'employees\'"')}${btn('<i class="fas fa-calculator mr-1"></i>薪酬试算', 'ghost', 'onclick="location.hash=\'payroll\'"')}${btn('<i class="fas fa-list-check mr-1"></i>发布任务（AI风控）', 'ghost', 'onclick="location.hash=\'tasks\'"')}${btn('<i class="fas fa-scale-balanced mr-1"></i>用工方案成本对比', 'ghost', 'onclick="location.hash=\'compare\'"')}</div>`)}</div>`;
+  $('#run-demo').onclick = async () => { try { const { data } = await eapi.post('/demo/run-flow', {}); modal('演示流程已完成 ✓', `<div class="text-sm space-y-2"><div>✅ 发布任务「演示任务 · 短视频剪辑」（AI 评分 0，绿色放行）</div><div>✅ 从业人员 <b>${esc(data.worker)}</b> 实名签约，电子合同已存证</div><div>✅ 交付 10 条成片，SHA-256 存证</div><div>✅ 您已验收，金额 <b>${money(data.amount)}</b> 进入待结算</div><div class="mt-4 p-3 bg-brand-50 rounded-lg text-brand-800"><i class="fas fa-arrow-right mr-1"></i>${data.next}</div></div>`, { footer: btn('稍后', 'ghost', 'onclick="closeModal()"') + btn('去薪酬管理发放 →', 'primary', 'onclick="closeModal();location.hash=\'payroll\'"') }); } catch (e) { toast(errMsg(e), 'error'); } };
   chart('trend-chart', { type: 'bar', data: { labels: d.trend.map(t => t.period), datasets: [{ label: '用工总成本', data: d.trend.map(t => t.cost), backgroundColor: '#2f5bea' }, { label: '实发', data: d.trend.map(t => t.net), backgroundColor: '#10b981' }] }, options: { plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } } });
 };
 
@@ -69,7 +84,11 @@ function empForm(e = {}) {
 // ---------------- 薪酬管理 ----------------
 VIEWS.payroll = async () => {
   const { data: batches } = await eapi.get('/payroll/batches');
+  const cur = k => batches.find(b => b.period === period() && b.layer === k);
+  const stepOf = b => !b ? 0 : { calculated: 1, approved: 2, paid: 3 }[b.status] || 0;
   $('#view').innerHTML = `
+  <div class="bg-white rounded-2xl border p-5 mb-4"><div class="font-bold mb-3"><i class="fas fa-list-ol text-brand-600 mr-2"></i>${period()} 发薪进度 <span class="text-xs text-slate-400 font-normal ml-2">每层四步：试算 → 生成批次 → 审批 → 发放</span></div>
+    <div class="grid md:grid-cols-3 gap-4">${['core', 'flex', 'task'].map(k => { const b = cur(k); const st = stepOf(b); return `<div><div class="text-sm font-medium mb-2"><span class="inline-block w-2 h-2 rounded-full bg-${LAYER[k][2]}-500 mr-2"></span>${LAYER[k][0]}</div><div class="flex items-center gap-1 text-xs">${['试算', '批次', '审批', '发放'].map((s, i) => `<span class="flex-1 text-center py-1 rounded ${i < st ? 'bg-emerald-100 text-emerald-700' : i === st ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-400'}">${i < st ? '✓ ' : ''}${s}</span>`).join('')}</div></div>`; }).join('')}</div></div>
   <div class="grid md:grid-cols-3 gap-4">
     ${['core', 'flex', 'task'].map(k => `<div class="bg-white rounded-2xl border border-slate-200 p-5"><div class="flex items-center justify-between"><div><div class="font-bold"><span class="inline-block w-2 h-2 rounded-full bg-${LAYER[k][2]}-500 mr-2"></span>${LAYER[k][0]}薪酬</div><div class="text-xs text-slate-500 mt-1">${{ core: '工资薪金累计预扣 · 三险一金', flex: '非全日制按小时计薪+工伤险 · 外包取票', task: '劳务报酬累计预扣（16号公告）+ 增值税代办' }[k]}</div></div></div>
       <div class="mt-4 flex gap-2">${btn('<i class="fas fa-calculator mr-1"></i>试算 ' + period(), 'primary', `data-calc="${k}"`)}</div></div>`).join('')}
@@ -107,11 +126,15 @@ async function batchDetail(id) {
 
 // ---------------- 任务与交付 ----------------
 VIEWS.tasks = async () => {
-  const { data: tasks } = await eapi.get('/tasks');
+  const [{ data: tasks }, { data: apps }] = await Promise.all([eapi.get('/tasks'), eapi.get('/applications')]);
+  const pendingDeliv = tasks.reduce((s, t) => s + 0, 0);
   $('#view').innerHTML = `
-  <div class="flex items-center justify-between mb-4"><p class="text-sm text-slate-500">任务必须以成果交付计价 · 发布前经劳动关系风控Agent全量筛查 · 红色任务禁止发布</p>${btn('<i class="fas fa-plus mr-1"></i>发布任务', 'primary', 'id="add-task"')}</div>
-  ${card('', table(['任务', '类别', '计价', '预算', '风险评分', '状态', '接单', '截止', '操作'], tasks.map(t => [`<b>${esc(t.title)}</b><div class="text-xs text-slate-400 max-w-xs truncate">${esc(t.description || '')}</div>`, esc(t.category || ''), `${PRICING[t.pricing_mode]}<div class="text-xs text-slate-400">${money(t.unit_price)} × ${t.quantity}</div>`, money(t.budget), `<span class="font-bold ${{ green: 'text-emerald-600', yellow: 'text-amber-500', red: 'text-red-600' }[t.risk_level]}">${t.risk_score}</span> ${badge(t.risk_level, t.risk_level)}`, sbadge(t.status), t.order_count, t.deadline || '', `${btn('风控详情', 'ghost', `data-risk="${t.id}"`)} ${t.status === 'published' ? btn('派单/签约', 'primary', `data-assign="${t.id}"`) : ''} ${btn('订单', 'ghost', `data-orders="${t.id}"`)}`])))}`;
+  <div class="flex items-center justify-between mb-4"><p class="text-sm text-slate-500">流程：发布任务（AI评分）→ 从业人员申请 → 您确认签约 → 对方交付 → 您验收 → 进入薪酬结算</p>${btn('<i class="fas fa-plus mr-1"></i>发布任务', 'primary', 'id="add-task"')}</div>
+  ${apps.length ? card(`<i class="fas fa-inbox text-brand-600 mr-2"></i>接单申请（${apps.length}）· 需要您确认`, `<div class="space-y-2">${apps.map(a => `<div class="flex items-center justify-between rounded-xl border p-3 bg-brand-50/50"><div class="text-sm"><b>${esc(a.worker_name)}</b> ${a.verified ? badge('green', '已实名') : badge('red', '未实名')} 申请「${esc(a.title)}」<div class="text-xs text-slate-500">${esc(a.skills || '')} · ${esc(a.region || '')} · ${money(a.unit_price)} × ${a.quantity}${a.message ? ' · "' + esc(a.message) + '"' : ''}</div></div><div class="flex gap-2">${btn('确认签约', 'success', `data-app-ok="${a.id}"`)}${btn('婉拒', 'ghost', `data-app-no="${a.id}"`)}</div></div>`).join('')}</div>`) + '<div class="h-4"></div>' : ''}
+  ${card('', table(['任务', '类别', '计价', '预算', '风险评分', '状态', '接单', '截止', '操作'], tasks.map(t => [`<b>${esc(t.title)}</b><div class="text-xs text-slate-400 max-w-xs truncate">${esc(t.description || '')}</div>`, esc(t.category || ''), `${PRICING[t.pricing_mode]}<div class="text-xs text-slate-400">${money(t.unit_price)} × ${t.quantity}</div>`, money(t.budget), `<span class="font-bold ${{ green: 'text-emerald-600', yellow: 'text-amber-500', red: 'text-red-600' }[t.risk_level]}">${t.risk_score}</span> ${badge(t.risk_level, t.risk_level)}`, sbadge(t.status), t.order_count, t.deadline || '', `${btn('风控详情', 'ghost', `data-risk="${t.id}"`)} ${t.status === 'published' ? btn('派单/签约', 'ghost', `data-assign="${t.id}"`) : ''} ${btn((t.delivered_count ? '<span class="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1"></span>验收(' + t.delivered_count + ')' : '订单'), t.delivered_count ? 'primary' : 'ghost', `data-orders="${t.id}"`)}`])))}`;
   $('#add-task').onclick = taskForm;
+  $$('[data-app-ok]').forEach(b => b.onclick = async () => { try { const { data } = await eapi.post(`/applications/${b.dataset.appOk}/decide`, { accept: true }); toast(`签约成功，电子合同 ${data.contract_no}`); route(); } catch (e) { toast(errMsg(e), 'error'); } });
+  $$('[data-app-no]').forEach(b => b.onclick = async () => { await eapi.post(`/applications/${b.dataset.appNo}/decide`, { accept: false }); toast('已婉拒', 'warn'); route(); });
   $$('[data-risk]').forEach(b => b.onclick = () => { const t = tasks.find(x => x.id == b.dataset.risk); modal(`风控评估 · ${esc(t.title)}`, riskPanel(t.risk_detail), { footer: btn('关闭', 'ghost', 'onclick="closeModal()"') }); });
   $$('[data-assign]').forEach(b => b.onclick = () => assignForm(tasks.find(x => x.id == b.dataset.assign)));
   $$('[data-orders]').forEach(b => b.onclick = () => ordersView(tasks.find(x => x.id == b.dataset.orders)));

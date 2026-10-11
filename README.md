@@ -18,11 +18,30 @@
 - **登录**：`/login`
 - **演示直登**：`/demo/admin` · `/demo/enterprise` · `/demo/opc`
 
-| 角色 | 账号 | 密码 | 入口 |
-|---|---|---|---|
-| 平台合规管理员 | `admin` | `Admin@2026` | `/admin` |
-| 企业 HR（星河直播传媒） | `hr_demo` | `Ent@2026` | `/enterprise` |
-| OPC 超级个体（林深数字创意） | `opc_demo` | `Opc@2026` | `/opc` |
+| 角色（面向客户） | 账号 | 密码 | 入口 | 一键直登 |
+|---|---|---|---|---|
+| 企业 HR / 财务（星河直播传媒） | `hr_demo` | `Ent@2026` | `/enterprise` | `/demo/enterprise` |
+| 灵活就业者（周小雨） | `worker_demo` | `Worker@2026` | `/worker` | `/demo/worker` |
+| OPC 超级个体（林深数字创意） | `opc_demo` | `Opc@2026` | `/opc` | `/demo/opc` |
+| 平台合规运营 | `admin` | `Admin@2026` | `/admin` | `/demo/admin` |
+
+## 怎么用（执行流程 × 客户角色）
+
+**一条主流程（8步）**：企业入驻 → 发布任务 → 接单签约 → 交付验收 → 一键发放 → 扣缴申报 → 代征解缴 → 凭证归档
+流程说明页：`/guide`
+
+每个工作台内置四件导航工具：
+- **顶部流程条**：显示主流程走到哪一步、哪些步骤归我（带锁的是别人负责）
+- **右上角「待办」**：按本期必须做的事排序，点击直达
+- **每页「这页怎么用」**：这页是干嘛的 + 操作步骤
+- **「新手引导」**：首次登录自动弹出的分步教程
+
+| 角色 | 每月只需做 |
+|---|---|
+| 企业 HR | ① 验收交付 → ② 三层薪酬试算→审批→发放 → ③ 拿凭证包（或点「一键跑通演示流程」） |
+| 灵活就业者 | ① 1分钟实名 → ② 任务大厅申请 → ③ 提交交付；然后看收入与税负 |
+| OPC | ① 记收入/成本 → ② 股东工资+分红试算发放 → ③ 看税务测算与三阶跃迁 |
+| 平台运营 | 按「待办」：实名核验 → 风控复核 → 申报复核提交 → 代征解缴出凭证 |
 
 ## 已完成的四大核心模块
 
@@ -59,6 +78,12 @@
 - **三阶跃迁**（L1 自然人 → L2 个体户 → L3 一人公司）税负对比与 AI 推荐，附真实经营前置条件自检
 - 一站式服务舱：开业包 / 财税托管 / 法务包 / 接单引擎 / AI 工具包 / 保障包
 
+### 5️⃣ 灵活就业者工作台（`/worker`，新增）
+- 首页：进度步骤条（实名→接单→交付→验收→收款）+ 「下一步做什么」+ 本年到手/预扣
+- 自助实名核验与代办申报授权（PIPL 单独同意流程）
+- 任务大厅申请接单 → 企业确认后自动签约；我的任务自助交付（哈希存证）
+- 收入与凭证、我的税负（累计预扣 vs 传统劳务逐月预测）、成长路径
+
 ### 平台后台其他能力
 风控中心（评估记录、人工放行/拦截、T+0 异常监测：一人多号、经济从属、起征点、实名、OPC集中度、AI 评分沙盒）、企业入驻与费率/风险等级管理、从业人员实名核验、OPC 管理、政策法规库（9 条，附文号与生效日期）、规则引擎参数化配置、审计日志。
 
@@ -79,13 +104,16 @@
 | `GET/POST /api/admin/collection/agreements` `GET /collection/records|summary` `POST /collection/certify/:period` | 委托代征 |
 | `GET /api/admin/risk/assessments|monitor` `POST /risk/assess` `POST /risk/tasks/:id/decision` | 风控 |
 | `GET/POST/PUT /api/admin/enterprises` `GET/POST /workers` `POST /workers/:id/verify` `GET /opcs` `GET /policies` `GET/PUT /settings` `GET /audit-logs` | 平台管理 |
+| `GET /api/worker/home|hall|income|tax` `POST /worker/verify` `POST /worker/hall/:id/apply` `POST /worker/orders/:id/deliver` | 从业人员端 |
+| `GET /api/guide/progress` `GET /api/guide/todos` | 流程进度与角色待办 |
+| `GET/POST /api/enterprise/applications[/:id/decide]` `POST /enterprise/demo/run-flow` | 接单申请确认 · 一键演示 |
 | `POST /api/public/calc/labor|wage|enterprise|opc` `POST /api/public/risk` | 公共测算器（PLG 入口） |
 
 ## 数据架构（Cloudflare D1）
 
-`users / sessions / enterprises / employees / payroll_batches / payroll_items / workers / tasks / task_orders / settlements / tax_filings / collection_agreements / collection_records / opcs / opc_incomes / opc_expenses / opc_payrolls / risk_assessments / audit_logs / policies / platform_settings`
+`users(含 worker 角色与 onboarded) / sessions / task_applications / enterprises / employees / payroll_batches / payroll_items / workers / tasks / task_orders / settlements / tax_filings / collection_agreements / collection_records / opcs / opc_incomes / opc_expenses / opc_payrolls / risk_assessments / audit_logs / policies / platform_settings`
 
-迁移文件：`migrations/0001_initial_schema.sql`；演示数据：`seed.sql`
+迁移文件：`migrations/0001_initial_schema.sql`、`0002_worker_role.sql`；演示数据：`seed.sql`
 
 ## 规则引擎（`src/lib/tax.ts` / `src/lib/risk.ts`）
 

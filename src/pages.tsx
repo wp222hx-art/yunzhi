@@ -183,43 +183,90 @@ export function landingPage() {
 }
 
 export function loginPage() {
+  const roles = [
+    ['enterprise', 'fa-building-user', '我是企业 HR / 财务', '要给员工发工资、给兼职结算、拿合规凭证', 'hr_demo', 'Ent@2026', 'brand'],
+    ['worker', 'fa-user', '我是灵活就业者', '想接任务、看到手收入、少缴冤枉税', 'worker_demo', 'Worker@2026', 'emerald'],
+    ['opc', 'fa-rocket', '我是超级个体 / 一人公司', '要给自己发工资、算分红、看该不该注册公司', 'opc_demo', 'Opc@2026', 'violet'],
+    ['admin', 'fa-building-shield', '我是平台合规运营', '要做扣缴申报、委托代征、风控复核', 'admin', 'Admin@2026', 'amber'],
+  ]
   return `${HEAD('登录')}
-<body class="min-h-screen bg-gradient-to-br from-brand-900 via-brand-700 to-indigo-600 grid place-items-center p-6">
-<main class="w-full max-w-5xl grid lg:grid-cols-2 rounded-3xl overflow-hidden shadow-2xl bg-white">
-  <section class="hidden lg:flex flex-col justify-between p-10 bg-ink text-white">
-    <div><a href="/" class="flex items-center gap-2 font-bold text-xl"><span class="w-9 h-9 rounded-xl bg-brand-600 grid place-items-center"><i class="fas fa-shield-halved"></i></span>云工智合佳</a>
-      <h1 class="mt-10 text-3xl font-bold leading-snug">AI 合规用工<br>操作系统</h1>
-      <p class="mt-4 text-slate-300 text-sm leading-relaxed">合规申报 · 委托代征 · 企业全量薪酬 · OPC经营舱<br>确定性由规则引擎保障，AI负责理解与建议。</p></div>
-    <div class="text-xs text-slate-400 space-y-2">
-      <div><i class="fas fa-check text-emerald-400 mr-2"></i>税务总局2025年第16号公告 · 累计预扣法</div>
-      <div><i class="fas fa-check text-emerald-400 mr-2"></i>五流合一凭证包 · 保存≥10年</div>
-      <div><i class="fas fa-check text-emerald-400 mr-2"></i>劳动关系风控Agent · 100%全量筛查</div>
-    </div>
-  </section>
-  <section class="p-10">
-    <h2 class="text-2xl font-bold">登录系统</h2>
-    <p class="text-sm text-slate-500 mt-1">选择角色或输入账号</p>
-    <div class="grid grid-cols-3 gap-2 mt-6 text-xs" id="role-quick">
-      <button data-u="admin" data-p="Admin@2026" class="role-btn border rounded-xl p-3 hover:border-brand-500 text-left"><i class="fas fa-building-shield text-brand-600"></i><div class="font-semibold mt-1">平台后台</div><div class="text-slate-400">合规申报·代征</div></button>
-      <button data-u="hr_demo" data-p="Ent@2026" class="role-btn border rounded-xl p-3 hover:border-brand-500 text-left"><i class="fas fa-building-user text-brand-600"></i><div class="font-semibold mt-1">企业端</div><div class="text-slate-400">三层薪酬</div></button>
-      <button data-u="opc_demo" data-p="Opc@2026" class="role-btn border rounded-xl p-3 hover:border-brand-500 text-left"><i class="fas fa-rocket text-brand-600"></i><div class="font-semibold mt-1">OPC端</div><div class="text-slate-400">超级个体</div></button>
-    </div>
-    <form id="login-form" class="mt-6 space-y-4">
-      <div><label class="text-sm text-slate-600">账号</label><input id="username" class="mt-1 w-full border rounded-lg px-3 py-2.5" placeholder="admin / hr_demo / opc_demo" autocomplete="username"></div>
-      <div><label class="text-sm text-slate-600">密码</label><input id="password" type="password" class="mt-1 w-full border rounded-lg px-3 py-2.5" autocomplete="current-password"></div>
+<body class="min-h-screen bg-gradient-to-br from-brand-900 via-brand-700 to-indigo-600 p-6">
+<main class="max-w-6xl mx-auto">
+  <div class="text-center text-white pt-6 pb-8">
+    <a href="/" class="inline-flex items-center gap-2 font-bold text-2xl"><span class="w-10 h-10 rounded-xl bg-white/20 grid place-items-center"><i class="fas fa-shield-halved"></i></span>云工智合佳</a>
+    <h1 class="mt-4 text-3xl font-bold">您是哪一类用户？</h1>
+    <p class="mt-2 text-brand-100">选择身份后一键进入，系统会按您的工作流程一步步引导</p>
+    <a href="/guide" class="inline-block mt-3 text-sm text-white/80 underline hover:text-white"><i class="fas fa-route mr-1"></i>先看看整个平台怎么运转（1分钟）</a>
+  </div>
+  <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4" id="role-cards">
+    ${roles.map(([k, i, t, d, u, p, c]) => `<button data-role="${k}" data-u="${u}" data-p="${p}" class="role-card text-left bg-white rounded-2xl p-6 hover:-translate-y-1 hover:shadow-2xl transition border-4 border-transparent">
+      <div class="w-12 h-12 rounded-xl bg-${c}-100 text-${c}-600 grid place-items-center text-xl"><i class="fas ${i}"></i></div>
+      <div class="mt-4 font-bold text-lg">${t}</div><div class="text-sm text-slate-500 mt-1 leading-relaxed">${d}</div>
+      <div class="mt-4 text-sm font-medium text-${c}-600">一键体验 <i class="fas fa-arrow-right ml-1"></i></div></button>`).join('')}
+  </div>
+  <div class="mt-8 max-w-md mx-auto bg-white rounded-2xl p-6">
+    <div class="text-sm font-semibold text-slate-700 mb-3"><i class="fas fa-key mr-1 text-slate-400"></i>已有账号？直接登录</div>
+    <form id="login-form" class="space-y-3">
+      <input id="username" class="w-full border rounded-lg px-3 py-2.5" placeholder="账号" autocomplete="username">
+      <input id="password" type="password" class="w-full border rounded-lg px-3 py-2.5" placeholder="密码" autocomplete="current-password">
       <div id="login-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2"></div>
       <button class="w-full bg-brand-600 hover:bg-brand-700 text-white rounded-lg py-2.5 font-medium">登录</button>
     </form>
-    <p class="mt-6 text-xs text-slate-400">演示账号：admin / Admin@2026 · hr_demo / Ent@2026 · opc_demo / Opc@2026</p>
-  </section>
+  </div>
+  <p class="text-center text-xs text-white/60 mt-6">演示账号：hr_demo / Ent@2026 · worker_demo / Worker@2026 · opc_demo / Opc@2026 · admin / Admin@2026</p>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
 <script>
-document.querySelectorAll('.role-btn').forEach(b=>b.onclick=()=>{username.value=b.dataset.u;password.value=b.dataset.p;document.querySelectorAll('.role-btn').forEach(x=>x.classList.remove('border-brand-500','bg-brand-50'));b.classList.add('border-brand-500','bg-brand-50')});
-document.getElementById('login-form').onsubmit=async e=>{e.preventDefault();const err=document.getElementById('login-error');err.classList.add('hidden');
-try{const r=await axios.post('/api/auth/login',{username:username.value.trim(),password:password.value});localStorage.setItem('cw_token',r.data.token);localStorage.setItem('cw_user',JSON.stringify(r.data.user));
-const next=new URLSearchParams(location.search).get('next');const home={admin:'/admin',enterprise:'/enterprise',opc:'/opc'}[r.data.user.role];location.href=next||home}catch(ex){err.textContent=ex.response?.data?.error||'登录失败';err.classList.remove('hidden')}};
+const home={admin:'/admin',enterprise:'/enterprise',opc:'/opc',worker:'/worker'};
+async function doLogin(u,p){const err=document.getElementById('login-error');err.classList.add('hidden');
+try{const r=await axios.post('/api/auth/login',{username:u,password:p});localStorage.setItem('cw_token',r.data.token);localStorage.setItem('cw_user',JSON.stringify(r.data.user));
+const next=new URLSearchParams(location.search).get('next');location.href=next||home[r.data.user.role]}catch(ex){err.textContent=ex.response?.data?.error||'登录失败';err.classList.remove('hidden')}}
+document.querySelectorAll('.role-card').forEach(b=>b.onclick=()=>{b.classList.add('border-brand-500');b.querySelector('.fa-arrow-right').className='fas fa-spinner fa-spin ml-1';doLogin(b.dataset.u,b.dataset.p)});
+document.getElementById('login-form').onsubmit=e=>{e.preventDefault();doLogin(username.value.trim(),password.value)};
 </script>
+</body></html>`
+}
+
+export function guidePage() {
+  const steps = [
+    ['01', '企业入驻', '平台运营', '尽调准入（工商/司法/税务信用）→ 配置纳税人身份与服务费率 → 开通企业账号', 'fa-building'],
+    ['02', '发布任务', '企业', '按成果计价发布任务（按件/项目/里程碑）→ AI劳动关系风控评分 → 绿放行/黄复核/红拦截', 'fa-list-check'],
+    ['03', '接单签约', '灵活就业者', '实名核验 + 签署代办申报授权 → 任务大厅申请 → 企业确认 → 自动生成电子合同并存证', 'fa-file-signature'],
+    ['04', '交付验收', '灵活就业者 + 企业', '上传交付成果（哈希存证）→ 企业验收签署 → 形成"真交付"证据', 'fa-box-open'],
+    ['05', '一键发放', '企业', '核心层/弹性层/任务层三层薪酬试算 → 审批 → 发放；任务层经持牌支付机构受托分账', 'fa-money-check-dollar'],
+    ['06', '扣缴申报', '平台运营', '劳务报酬累计预扣 + 增值税代办申报草稿自动生成 → 规则引擎重算复核 → 提交 → 回执', 'fa-file-invoice'],
+    ['07', '代征解缴', '平台运营', '委托代征税款汇总解缴 → 出具完税凭证', 'fa-landmark'],
+    ['08', '凭证归档', '企业', '五流合一凭证包（合同·业务·资金·票据·个税）自动归档，支持税前扣除，保存≥10年', 'fa-file-shield'],
+  ]
+  const personas = [
+    ['fa-building-user', '企业 HR / 财务', 'brand', '/demo/enterprise', ['录人员（三层结构）', '发任务（AI风控）', '验收交付', '算薪发放', '拿凭证包'], '每月15日前把本月薪酬发了，系统其余自动流转'],
+    ['fa-user', '灵活就业者', 'emerald', '/demo/worker', ['1分钟实名', '任务大厅接单', '交付成果', '看到手收入', '看税负与成长建议'], '只需做三件事：实名、接单、交付'],
+    ['fa-rocket', '超级个体 / OPC', 'violet', '/demo/opc', ['记收入与成本', '给自己发工资+分红', '看增值税与所得税', '三阶跃迁测算', '四道防火墙'], '把一人公司的财税跑在一个仪表盘上'],
+    ['fa-building-shield', '平台合规运营', 'amber', '/demo/admin', ['企业入驻尽调', '从业人员实名', '风控复核', '申报复核与提交', '代征解缴出凭证'], '每期按"待办"清单逐项处理，零遗漏'],
+  ]
+  return `${HEAD('平台运转流程')}
+<body class="bg-slate-50 text-ink">
+<header class="bg-white border-b"><nav class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between"><a href="/" class="flex items-center gap-2 font-bold"><span class="w-9 h-9 rounded-xl bg-brand-600 text-white grid place-items-center"><i class="fas fa-shield-halved"></i></span>云工智合佳</a><a href="/login" class="text-sm bg-brand-600 text-white px-4 py-2 rounded-lg">选择身份进入</a></nav></header>
+<main class="max-w-6xl mx-auto px-6 py-12">
+  <h1 class="text-3xl font-bold text-center">一分钟看懂：平台是怎么运转的</h1>
+  <p class="text-center text-slate-500 mt-2">一条主流程 · 四类角色 · 每一步都有证据留痕</p>
+  <section class="mt-10 grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+    ${steps.map(([n, t, o, d, i]) => `<article class="bg-white rounded-2xl border p-5 relative"><div class="absolute -top-3 left-5 bg-brand-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">${n}</div><div class="flex items-center justify-between mt-1"><div class="font-bold">${t}</div><i class="fas ${i} text-brand-500"></i></div><div class="text-xs text-brand-700 bg-brand-50 inline-block px-2 py-0.5 rounded mt-2">${o}</div><p class="text-sm text-slate-600 mt-3 leading-relaxed">${d}</p></article>`).join('')}
+  </section>
+  <h2 class="text-2xl font-bold text-center mt-16">您在流程中的位置</h2>
+  <section class="mt-8 grid md:grid-cols-2 gap-5">
+    ${personas.map(([i, t, c, h, list, tip]) => `<article class="bg-white rounded-2xl border p-6"><div class="flex items-center gap-3"><div class="w-11 h-11 rounded-xl bg-${c}-100 text-${c}-600 grid place-items-center"><i class="fas ${i}"></i></div><div class="font-bold text-lg">${t}</div></div><ol class="mt-4 space-y-2">${(list as string[]).map((x, idx) => `<li class="flex items-center gap-3 text-sm"><span class="w-6 h-6 rounded-full bg-${c}-50 text-${c}-700 text-xs grid place-items-center font-bold">${idx + 1}</span>${x}</li>`).join('')}</ol><div class="mt-4 text-xs text-slate-500 bg-slate-50 rounded-lg p-3"><i class="fas fa-lightbulb text-amber-500 mr-1"></i>${tip}</div><a href="${h}" class="inline-block mt-4 text-sm bg-${c}-600 text-white px-4 py-2 rounded-lg">以此身份体验 <i class="fas fa-arrow-right ml-1"></i></a></article>`).join('')}
+  </section>
+  <section class="mt-16 bg-ink text-white rounded-3xl p-10">
+    <h2 class="text-2xl font-bold">为什么这样设计？</h2>
+    <div class="grid md:grid-cols-3 gap-6 mt-6 text-sm text-slate-300">
+      <div><div class="text-white font-semibold mb-1">① 每一步都留证据</div>税前扣除的生命线是"业务真实性材料"。合同哈希、交付哈希、分账流水、完税凭证自动归档成五流合一凭证包。</div>
+      <div><div class="text-white font-semibold mb-1">② 风控前置，不事后救火</div>任务发布前 AI 评分；老员工转灵工一票否决；未实名不可签约——把风险挡在发生之前。</div>
+      <div><div class="text-white font-semibold mb-1">③ 算税交给规则，建议交给 AI</div>累计预扣、增值税起征点、小微优惠全部是确定性规则；AI 只负责解释、提醒与推荐。</div>
+    </div>
+  </section>
+</main>
+<footer class="py-8 text-center text-xs text-slate-400">测算为示意口径，以主管税务机关意见为准</footer>
 </body></html>`
 }
 
@@ -227,10 +274,11 @@ const NAVS: Record<string, Array<[string, string, string]>> = {
   admin: [['dashboard', 'fa-gauge-high', '平台总览'], ['filings', 'fa-file-signature', '合规申报中心'], ['collection', 'fa-landmark', '委托代征'], ['risk', 'fa-shield-halved', '风控中心'], ['enterprises', 'fa-building', '企业管理'], ['workers', 'fa-users', '从业人员'], ['opcs', 'fa-rocket', 'OPC管理'], ['policies', 'fa-book', '政策法规库'], ['settings', 'fa-sliders', '规则参数'], ['logs', 'fa-clock-rotate-left', '审计日志']],
   enterprise: [['dashboard', 'fa-gauge-high', '用工驾驶舱'], ['employees', 'fa-sitemap', '三层用工结构'], ['payroll', 'fa-money-check-dollar', '薪酬管理'], ['tasks', 'fa-list-check', '任务与交付'], ['settlements', 'fa-file-shield', '结算与凭证包'], ['compare', 'fa-scale-balanced', '成本对比'], ['logs', 'fa-clock-rotate-left', '操作日志']],
   opc: [['dashboard', 'fa-gauge-high', '经营舱'], ['income', 'fa-sack-dollar', '收入与成本'], ['payroll', 'fa-wallet', 'OPC薪酬'], ['tax', 'fa-receipt', '税务测算'], ['growth', 'fa-stairs', '三阶跃迁'], ['cabin', 'fa-box-open', '一站式服务']],
+  worker: [['home', 'fa-house', '我的首页'], ['hall', 'fa-store', '任务大厅'], ['orders', 'fa-list-check', '我的任务'], ['income', 'fa-wallet', '收入与凭证'], ['tax', 'fa-receipt', '我的税负'], ['growth', 'fa-stairs', '成长路径']],
 }
-const TITLES: Record<string, string> = { admin: '平台合规后台', enterprise: '企业用工管理', opc: 'OPC 一站式经营舱' }
+const TITLES: Record<string, string> = { admin: '平台合规后台', enterprise: '企业用工管理', opc: 'OPC 一站式经营舱', worker: '灵活就业者工作台' }
 
-export function appShell(role: 'admin' | 'enterprise' | 'opc', user: any) {
+export function appShell(role: 'admin' | 'enterprise' | 'opc' | 'worker', user: any) {
   const nav = NAVS[role]
   return `${HEAD(TITLES[role])}
 <body class="bg-slate-50 text-ink">
@@ -250,18 +298,21 @@ export function appShell(role: 'admin' | 'enterprise' | 'opc', user: any) {
   </aside>
   <div class="flex-1 min-w-0 flex flex-col">
     <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-30">
-      <h1 id="page-title" class="font-bold text-lg"></h1>
+      <div class="flex items-center gap-3"><h1 id="page-title" class="font-bold text-lg"></h1><button id="help-btn" class="text-xs text-brand-600 bg-brand-50 hover:bg-brand-100 px-2 py-1 rounded-lg"><i class="fas fa-circle-question mr-1"></i>这页怎么用</button></div>
       <div class="flex items-center gap-3 text-sm">
         <label class="text-slate-500">期间</label>
         <input id="global-period" type="month" class="border rounded-lg px-2 py-1.5" value="${new Date().toISOString().slice(0, 7)}">
-        <span class="text-xs text-slate-400 hidden md:inline"><i class="fas fa-circle text-emerald-500 text-[8px] mr-1"></i>规则引擎 · 政策基准 2026-10-09</span>
+        <button id="todo-btn" class="relative border rounded-lg px-3 py-1.5 hover:bg-slate-50"><i class="fas fa-bell mr-1"></i>待办<span id="todo-count" class="hidden absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 grid place-items-center">0</span></button>
+        <button id="tour-btn" class="border rounded-lg px-3 py-1.5 hover:bg-slate-50 text-slate-600"><i class="fas fa-graduation-cap mr-1"></i>新手引导</button>
       </div>
     </header>
+    <div id="flow-bar" class="bg-white border-b border-slate-200 px-6 py-3 hidden"></div>
     <main id="view" class="flex-1 p-6"></main>
     <footer class="px-6 py-3 text-xs text-slate-400 border-t border-slate-200">AI辅助生成内容均经规则引擎校验并保留人工复核节点 · 测算为示意口径，以主管税务机关意见为准</footer>
   </div>
 </div>
 <div id="modal-root"></div>
+<div id="todo-drawer" class="fixed inset-y-0 right-0 w-96 max-w-full bg-white shadow-2xl z-40 translate-x-full transition-transform flex flex-col"><div class="h-16 border-b flex items-center justify-between px-5"><div class="font-bold"><i class="fas fa-bell text-brand-600 mr-2"></i>本期待办 · 下一步做什么</div><button id="todo-close" class="text-slate-400"><i class="fas fa-xmark"></i></button></div><div id="todo-list" class="flex-1 overflow-auto p-4 space-y-3"></div></div>
 <div id="toast-root" class="fixed top-4 right-4 z-50 space-y-2"></div>
 <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>

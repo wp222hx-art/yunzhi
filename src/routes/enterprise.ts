@@ -272,7 +272,7 @@ ent.get('/payroll/payslip/:item_id', async (c) => {
 
 // ---------------- 任务与交付 ----------------
 ent.get('/tasks', async (c) => {
-  const rows = await c.env.DB.prepare(`SELECT t.*, (SELECT COUNT(*) FROM task_orders o WHERE o.task_id=t.id) order_count FROM tasks t WHERE enterprise_id=? ORDER BY id DESC`).bind(entId(c)).all<any>()
+  const rows = await c.env.DB.prepare(`SELECT t.*, (SELECT COUNT(*) FROM task_orders o WHERE o.task_id=t.id) order_count, (SELECT COUNT(*) FROM task_orders o WHERE o.task_id=t.id AND o.status='delivered') delivered_count FROM tasks t WHERE enterprise_id=? ORDER BY id DESC`).bind(entId(c)).all<any>()
   rows.results.forEach(t => { t.risk_detail = t.risk_detail ? JSON.parse(t.risk_detail) : null })
   return c.json(rows.results)
 })
@@ -298,25 +298,10 @@ ent.get('/tasks/:id/orders', async (c) => {
   return c.json(rows.results)
 })
 ent.post('/tasks/:id/orders', async (c) => {
-  const eid = entId(c)
   const b = await c.req.json<any>()
-  const t = await c.env.DB.prepare(`SELECT * FROM tasks WHERE id=? AND enterprise_id=?`).bind(c.req.param('id'), eid).first<any>()
-  if (!t) return c.json({ error: '任务不存在' }, 404)
-  if (t.status !== 'published') return c.json({ error: `任务状态为${t.status}，不可派单` }, 422)
-  const w = await c.env.DB.prepare(`SELECT * FROM workers WHERE id=?`).bind(b.worker_id).first<any>()
-  if (!w) return c.json({ error: '从业人员不存在' }, 404)
-  if (!w.verified) return c.json({ error: '该从业人员尚未完成实名核验，不可签约（16号公告强制）' }, 422)
-  if (!w.authorized_filing) return c.json({ error: '该从业人员尚未签署代办申报授权书' }, 422)
-  const dup = await c.env.DB.prepare(`SELECT id,name FROM employees WHERE enterprise_id=? AND id_no=? AND layer IN ('core','flex') AND status='active'`).bind(eid, w.id_no).first<any>()
-  if (dup) return c.json({ error: `风控拦截：${w.name} 为本企业在职员工，禁止以灵活用工签约` }, 422)
-  const no = genNo('CT')
-  const hash = await (async () => { const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${no}|${t.id}|${w.id}|${Date.now()}`)); return [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2, '0')).join('') })()
-  const r = await c.env.DB.prepare(`INSERT INTO task_orders (task_id,worker_id,contract_no,contract_hash,status) VALUES (?,?,?,?,'signed')`).bind(t.id, w.id, no, hash).run()
-  // 自动将从业人员纳入企业任务层花名册
-  const ex = await c.env.DB.prepare(`SELECT id FROM employees WHERE enterprise_id=? AND worker_id=?`).bind(eid, w.id).first()
-  if (!ex) await c.env.DB.prepare(`INSERT INTO employees (enterprise_id,name,id_no,phone,layer,employment_type,position,start_date,worker_id) VALUES (?,?,?,?,'task','platform',?,date('now'),?)`).bind(eid, w.name, w.id_no, w.phone, t.category || '平台任务', w.id).run()
-  await audit(c.env.DB, c.get('user'), 'SIGN_ORDER', `order:${r.meta.last_row_id}`, `${t.title} → ${w.name} 电子合同${no}`)
-  return c.json({ id: r.meta.last_row_id, contract_no: no, contract_hash: hash })
+  const res = await signOrder(c, entId(c), Number(c.req.param('id')), Number(b.worker_id))
+  if ('error' in res) return c.json(res, res.error.includes('不存在') ? 404 : 422)
+  return c.json(res)
 })
 ent.post('/orders/:id/deliver', async (c) => {
   const b = await c.req.json<any>()
@@ -344,6 +329,61 @@ ent.post('/orders/:id/accept', async (c) => {
   await audit(c.env.DB, u, 'ACCEPT', `order:${o.id}`, `验收通过，金额${o.amount}`)
   return c.json({ ok: true })
 })
+
+// 接单申请
+ent.get('/applications', async (c) => {
+  const rows = await c.env.DB.prepare(`SELECT a.*, t.title, t.unit_price, t.quantity, w.name worker_name, w.skills, w.region, w.verified FROM task_applications a JOIN tasks t ON t.id=a.task_id JOIN workers w ON w.id=a.worker_id WHERE t.enterprise_id=? AND a.status='pending' ORDER BY a.id DESC`).bind(entId(c)).all()
+  return c.json(rows.results)
+})
+ent.post('/applications/:id/decide', async (c) => {
+  const eid = entId(c)
+  const { accept } = await c.req.json<any>()
+  const a = await c.env.DB.prepare(`SELECT a.*, t.enterprise_id FROM task_applications a JOIN tasks t ON t.id=a.task_id WHERE a.id=?`).bind(c.req.param('id')).first<any>()
+  if (!a || a.enterprise_id !== eid) return c.json({ error: '申请不存在' }, 404)
+  if (!accept) { await c.env.DB.prepare(`UPDATE task_applications SET status='rejected' WHERE id=?`).bind(a.id).run(); return c.json({ ok: true }) }
+  // 复用签约逻辑
+  const res = await signOrder(c, eid, a.task_id, a.worker_id)
+  if ('error' in res) return c.json(res, 422)
+  await c.env.DB.prepare(`UPDATE task_applications SET status='accepted' WHERE id=?`).bind(a.id).run()
+  return c.json(res)
+})
+
+/** 一键演示：为当前企业跑通 发布任务→签约→交付→验收 全链路（仅演示用） */
+ent.post('/demo/run-flow', async (c) => {
+  const eid = entId(c), db = c.env.DB
+  const u = c.get('user')
+  const r = await db.prepare(`INSERT INTO tasks (enterprise_id,title,category,description,pricing_mode,unit_price,quantity,budget,deliverable_spec,acceptance_std,risk_score,risk_level,risk_detail,status,deadline) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(eid, `演示任务 · 短视频剪辑（${new Date().toISOString().slice(11, 16)}）`, '直播电商/MCN', '按条交付成片，含字幕与封面', 'piece', 300, 10, 3000, '成片MP4 + 封面', '时长≥60s，通过验收', 0, 'green', JSON.stringify({ score: 0, level: 'green', decision: 'pass', factors: [], advice: '自动放行', basis: '', aiNote: '' }), 'published', null).run()
+  const tid = r.meta.last_row_id as number
+  const worker = await db.prepare(`SELECT id,name FROM workers WHERE verified=1 AND id NOT IN (SELECT COALESCE(worker_id,0) FROM employees WHERE enterprise_id=? AND layer IN ('core','flex')) ORDER BY id LIMIT 1`).bind(eid).first<any>()
+  const sign = await signOrder(c, eid, tid, worker.id)
+  if ('error' in sign) return c.json(sign, 422)
+  const hash = await sha(`${sign.id}|demo|${Date.now()}`)
+  await db.prepare(`UPDATE task_orders SET status='accepted', quantity_done=10, amount=3000, deliverable_desc='10条成片（演示）', deliverable_hash=?, delivered_at=datetime('now'), accepted_at=datetime('now'), accepted_by=? WHERE id=?`).bind(hash, u.display_name, sign.id).run()
+  await audit(db, u, 'DEMO_FLOW', `task:${tid}`, `演示：发布→${worker.name}签约→交付→验收，金额3000`)
+  return c.json({ ok: true, task_id: tid, worker: worker.name, amount: 3000, next: '前往「薪酬管理」试算任务层，即可看到该笔3000元进入结算' })
+})
+
+async function sha(s: string) { const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2, '0')).join('') }
+async function signOrder(c: any, eid: number, taskId: number, workerId: number): Promise<any> {
+  const db = c.env.DB
+  const t = await db.prepare(`SELECT * FROM tasks WHERE id=? AND enterprise_id=?`).bind(taskId, eid).first<any>()
+  if (!t) return { error: '任务不存在' }
+  if (t.status !== 'published') return { error: `任务状态为${t.status}，不可派单` }
+  const w = await db.prepare(`SELECT * FROM workers WHERE id=?`).bind(workerId).first<any>()
+  if (!w) return { error: '从业人员不存在' }
+  if (!w.verified) return { error: '该从业人员尚未完成实名核验，不可签约（16号公告强制）' }
+  if (!w.authorized_filing) return { error: '该从业人员尚未签署代办申报授权书' }
+  const dup = await db.prepare(`SELECT id,name FROM employees WHERE enterprise_id=? AND id_no=? AND layer IN ('core','flex') AND status='active'`).bind(eid, w.id_no).first<any>()
+  if (dup) return { error: `风控拦截：${w.name} 为本企业在职员工，禁止以灵活用工签约` }
+  const no = genNo('CT')
+  const hash = await sha(`${no}|${t.id}|${w.id}|${Date.now()}`)
+  const r = await db.prepare(`INSERT INTO task_orders (task_id,worker_id,contract_no,contract_hash,status) VALUES (?,?,?,?,'signed')`).bind(t.id, w.id, no, hash).run()
+  const ex = await db.prepare(`SELECT id FROM employees WHERE enterprise_id=? AND worker_id=?`).bind(eid, w.id).first()
+  if (!ex) await db.prepare(`INSERT INTO employees (enterprise_id,name,id_no,phone,layer,employment_type,position,start_date,worker_id) VALUES (?,?,?,?,'task','platform',?,date('now'),?)`).bind(eid, w.name, w.id_no, w.phone, t.category || '平台任务', w.id).run()
+  await audit(db, c.get('user'), 'SIGN_ORDER', `order:${r.meta.last_row_id}`, `${t.title} → ${w.name} 电子合同${no}`)
+  return { id: r.meta.last_row_id, contract_no: no, contract_hash: hash }
+}
 
 ent.get('/workers', async (c) => {
   const rows = await c.env.DB.prepare(`SELECT id,name,phone,verified,authorized_filing,region,skills,status FROM workers WHERE status='active' ORDER BY id`).all()

@@ -7,9 +7,11 @@ import authRoutes from './routes/auth'
 import enterpriseRoutes from './routes/enterprise'
 import opcRoutes from './routes/opc'
 import adminRoutes from './routes/admin'
+import workerRoutes from './routes/worker'
+import guideRoutes from './routes/guide'
 import { laborCumulative, laborLegacy, vatAgent, opcCompare, enterpriseCostCompare, wageCumulative, socialInsurance, DEFAULT_SOCIAL, r2 } from './lib/tax'
 import { scoreLaborRisk } from './lib/risk'
-import { landingPage, loginPage, appShell } from './pages'
+import { landingPage, loginPage, appShell, guidePage } from './pages'
 
 const app = new Hono<Env>()
 
@@ -21,6 +23,8 @@ app.route('/api/auth', authRoutes)
 app.route('/api/enterprise', enterpriseRoutes)
 app.route('/api/opc', opcRoutes)
 app.route('/api/admin', adminRoutes)
+app.route('/api/worker', workerRoutes)
+app.route('/api/guide', guideRoutes)
 
 // 公共测算器（门户免费工具 · PLG 入口）
 app.get('/api/public/health', (c) => c.json({ ok: true, name: '云工智合佳 Compliance OS', policy_baseline: '2026-10-09' }))
@@ -65,10 +69,11 @@ app.post('/api/public/risk', async (c) => c.json(scoreLaborRisk(await c.req.json
 
 // ---------- 页面 ----------
 app.get('/', (c) => c.html(landingPage()))
+app.get('/guide', (c) => c.html(guidePage()))
 app.get('/login', (c) => c.html(loginPage()))
 // 演示快捷登录（仅用于演示账号）
 app.get('/demo/:role', async (c) => {
-  const map: Record<string, [string, string]> = { admin: ['admin', 'Admin@2026'], enterprise: ['hr_demo', 'Ent@2026'], opc: ['opc_demo', 'Opc@2026'] }
+  const map: Record<string, [string, string]> = { admin: ['admin', 'Admin@2026'], enterprise: ['hr_demo', 'Ent@2026'], opc: ['opc_demo', 'Opc@2026'], worker: ['worker_demo', 'Worker@2026'] }
   const m = map[c.req.param('role')]
   if (!m) return c.redirect('/login')
   const u = await c.env.DB.prepare(`SELECT * FROM users WHERE username=?`).bind(m[0]).first<any>()
@@ -81,6 +86,7 @@ app.get('/demo/:role', async (c) => {
 })
 app.get('/admin', async (c) => { const u = await loadUser(c); if (!u || u.role !== 'admin') return c.redirect('/login?next=/admin'); return c.html(appShell('admin', u)) })
 app.get('/enterprise', async (c) => { const u = await loadUser(c); if (!u || !['enterprise', 'admin'].includes(u.role)) return c.redirect('/login?next=/enterprise'); return c.html(appShell('enterprise', u)) })
+app.get('/worker', async (c) => { const u = await loadUser(c); if (!u || !['worker', 'admin'].includes(u.role)) return c.redirect('/login?next=/worker'); return c.html(appShell('worker', u)) })
 app.get('/opc', async (c) => { const u = await loadUser(c); if (!u || !['opc', 'admin'].includes(u.role)) return c.redirect('/login?next=/opc'); return c.html(appShell('opc', u)) })
 
 export default app
