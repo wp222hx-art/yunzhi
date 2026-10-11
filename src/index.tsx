@@ -13,7 +13,9 @@ import aiRoutes, { aiAdmin } from './routes/ai'
 import { runDlp, dlpOutput, routeModel, callChat, creditsFor, evidenceHash, resolveProvider, type ModelRow, type DlpRule } from './lib/gateway'
 import { laborCumulative, laborLegacy, vatAgent, opcCompare, enterpriseCostCompare, wageCumulative, socialInsurance, DEFAULT_SOCIAL, r2 } from './lib/tax'
 import { scoreLaborRisk } from './lib/risk'
-import { landingPage, loginPage, appShell, guidePage } from './pages'
+import { loginPage, appShell } from './pages'
+import { landingPage, guidePage, solutionsPage, aiToolsPage, enginePage, calcPage, opcPage } from './marketing'
+import assistantRoutes from './routes/assistant'
 
 const app = new Hono<Env>()
 
@@ -29,6 +31,7 @@ app.route('/api/worker', workerRoutes)
 app.route('/api/guide', guideRoutes)
 app.route('/api/ai', aiRoutes)
 app.route('/api/admin/ai', aiAdmin)
+app.route('/api/assistant', assistantRoutes)
 
 // ---------- 对外 OpenAI 兼容网关：企业用自己的子密钥调用（L1 统一接入） ----------
 app.get('/v1/models', async (c) => {
@@ -112,6 +115,11 @@ app.post('/api/public/risk', async (c) => c.json(scoreLaborRisk(await c.req.json
 // ---------- 页面 ----------
 app.get('/', (c) => c.html(landingPage()))
 app.get('/guide', (c) => c.html(guidePage()))
+app.get('/solutions', (c) => c.html(solutionsPage()))
+app.get('/ai-tools', (c) => c.html(aiToolsPage()))
+app.get('/engine', (c) => c.html(enginePage()))
+app.get('/calc', (c) => c.html(calcPage()))
+app.get('/opc-path', (c) => c.html(opcPage()))
 app.get('/login', (c) => c.html(loginPage()))
 // 演示快捷登录（仅用于演示账号）
 app.get('/demo/:role', async (c) => {

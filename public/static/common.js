@@ -49,7 +49,7 @@ function chart(id, cfg) { if (_charts[id]) _charts[id].destroy(); const el = $('
 
 // 路由
 const VIEWS = {};
-const DEFAULT_VIEW = window.__ROLE__ === 'worker' ? 'home' : 'dashboard';
+const DEFAULT_VIEW = window.__ROLE__ === 'worker' ? 'home' : 'dashboard'; window.DEFAULT_VIEW = DEFAULT_VIEW;
 function route() {
   const key = (location.hash || '#' + DEFAULT_VIEW).slice(1).split('?')[0];
   $$('.nav-item').forEach(a => a.classList.toggle('bg-brand-600', a.dataset.view === key));
@@ -170,4 +170,5 @@ route = function () { _route(); renderFlowBar(); loadTodos(); };
 window.removeEventListener('hashchange', _route); window.addEventListener('hashchange', route);
 $('#global-period').removeEventListener('change', _route); $('#global-period').addEventListener('change', route);
 document.removeEventListener('DOMContentLoaded', _route);
-document.addEventListener('DOMContentLoaded', () => { route(); if (!window.__USER__.onboarded && !localStorage.getItem('cw_tour_' + window.__ROLE__)) setTimeout(() => startTour(0), 600); });
+document.addEventListener('DOMContentLoaded', () => { route(); if (!window.__USER__.onboarded && !localStorage.getItem('cw_tour_' + window.__ROLE__)) setTimeout(() => { if (window.CWTour) { if (!CWTour.isActive()) CWTour.startLayoutTour(); } else startTour(0); }, 900); });
+window.HELP = HELP; window.TOUR = TOUR;

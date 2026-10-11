@@ -4,3 +4,32 @@ body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft
 table th { position: sticky; top: 0; background: #fff }
 input[type=number]::-webkit-inner-spin-button { opacity: .4 }
 details summary::-webkit-details-marker { display: none }
+
+/* ===== Spotlight 聚光灯引导 ===== */
+#spotlight { display: none; position: fixed; inset: 0; z-index: 70; pointer-events: none; }
+#spotlight.on { display: block; }
+#sp-mask { position: absolute; inset: 0; background: rgba(11, 18, 32, .62); pointer-events: auto; transition: clip-path .28s ease; }
+#sp-hole { position: absolute; border-radius: 14px; box-shadow: 0 0 0 3px #2f5bea, 0 0 24px 4px rgba(47, 91, 234, .55); transition: all .28s ease; pointer-events: none; }
+#sp-hole::after { content: ''; position: absolute; inset: -6px; border-radius: 18px; border: 2px solid rgba(47, 91, 234, .5); animation: sp-pulse 1.6s ease-out infinite; }
+@keyframes sp-pulse { 0% { transform: scale(1); opacity: .9 } 100% { transform: scale(1.06); opacity: 0 } }
+#sp-pop { pointer-events: auto; position: absolute; background: #fff; border-radius: 16px; padding: 18px 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, .35); transition: left .28s ease, top .28s ease; animation: fadein .25s; }
+
+/* ===== AI 助手悬浮窗 ===== */
+#cw-assistant-btn { position: fixed; right: 22px; bottom: 22px; z-index: 60; width: 56px; height: 56px; border-radius: 9999px; background: linear-gradient(135deg, #2f5bea, #6d4aff); color: #fff; box-shadow: 0 10px 30px rgba(47, 91, 234, .45); display: grid; place-items: center; font-size: 22px; cursor: pointer; transition: transform .15s; }
+#cw-assistant-btn:hover { transform: scale(1.06); }
+#cw-assistant-btn .dot { position: absolute; top: -2px; right: -2px; width: 14px; height: 14px; border-radius: 9999px; background: #10b981; border: 2px solid #fff; }
+#cw-assistant { position: fixed; right: 22px; bottom: 90px; z-index: 60; width: 400px; max-width: calc(100vw - 32px); height: 600px; max-height: calc(100vh - 110px); background: #fff; border-radius: 20px; box-shadow: 0 24px 70px rgba(0, 0, 0, .28); display: none; flex-direction: column; overflow: hidden; animation: fadein .2s; }
+#cw-assistant.open { display: flex; }
+#cw-msgs { flex: 1; overflow: auto; padding: 14px; background: #f8fafc; }
+.cw-m { max-width: 92%; margin-bottom: 10px; font-size: 13.5px; line-height: 1.6; }
+.cw-m.user { margin-left: auto; background: #2f5bea; color: #fff; border-radius: 14px 14px 4px 14px; padding: 9px 12px; }
+.cw-m.bot { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px 14px 14px 4px; padding: 10px 12px; }
+.cw-m.bot table { font-size: 12px; margin: 6px 0; border-collapse: collapse; }
+.cw-m.bot td { border: 1px solid #e2e8f0; padding: 2px 6px; }
+.cw-act { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; margin: 6px 6px 0 0; padding: 5px 10px; border-radius: 9999px; border: 1px solid #c7d7ff; background: #eef4ff; color: #1f46c7; cursor: pointer; }
+.cw-act:hover { background: #d9e5ff; }
+.cw-chip { font-size: 12px; padding: 5px 10px; border-radius: 9999px; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; white-space: nowrap; }
+.cw-chip:hover { border-color: #2f5bea; color: #1f46c7; }
+.cw-typing span { display: inline-block; width: 6px; height: 6px; margin-right: 3px; border-radius: 9999px; background: #94a3b8; animation: cw-b 1s infinite; }
+.cw-typing span:nth-child(2) { animation-delay: .15s } .cw-typing span:nth-child(3) { animation-delay: .3s }
+@keyframes cw-b { 0%, 80%, 100% { transform: translateY(0) } 40% { transform: translateY(-5px) } }
