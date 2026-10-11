@@ -1,0 +1,83 @@
+/* OPC 端：经营舱 · 收入成本 · 股东薪酬+分红 · 税务测算 · 三阶跃迁 */
+const OP = window.__ROLE__ === 'admin' ? { opc_id: new URLSearchParams(location.hash.split('?')[1] || '').get('oid') || 1 } : {};
+const oapi = { get: (u, p = {}) => api.get('/opc' + u, { params: { ...OP, ...p } }), post: (u, b) => api.post('/opc' + u, b, { params: OP }), put: (u, b) => api.put('/opc' + u, b, { params: OP }), del: u => api.delete('/opc' + u, { params: OP }) };
+const ENT = { individual: 'L1 平台从业人员', sole_proprietor: 'L2 个体工商户', company: 'L3 一人有限公司' };
+
+VIEWS.dashboard = async () => {
+  const { data: d } = await oapi.get('/dashboard');
+  const o = d.opc;
+  $('#view').innerHTML = `
+  <div class="flex items-center justify-between mb-5"><div><div class="text-xl font-bold">${esc(o.name)}</div><div class="text-sm text-slate-500">${ENT[o.entity_type]} · ${esc(o.industry || '')} · ${esc(o.region || '')} · 经营者 ${esc(o.owner_name)}</div></div>${btn('<i class="fas fa-gear mr-1"></i>主体设置', 'ghost', 'id="o-edit"')}</div>
+  <div class="grid md:grid-cols-4 gap-4">
+    ${stat(d.year + ' 年度收入', money(d.totalIncome), `年化 ${money(d.annualized)}`, 'fa-sack-dollar')}
+    ${stat('年度成本（有凭证）', money(d.totalExpense), `成本率 ${d.totalIncome ? pct(d.totalExpense / d.totalIncome * 100) : '—'}`, 'fa-receipt', 'amber')}
+    ${stat('账面利润', money(d.profit), '未扣股东工资与税费', 'fa-chart-line', 'emerald')}
+    ${stat('最大客户占比', pct(d.topShare), d.topShare > 70 ? '超过70%预警线' : '安全区间 ≤70%', 'fa-users-viewfinder', d.topShare > 70 ? 'red' : 'brand')}
+  </div>
+  <div class="grid lg:grid-cols-3 gap-4 mt-4">
+    ${card('收入 / 成本月度趋势', '<canvas id="o-trend" height="200"></canvas>')}
+    ${card('客户结构（近6个月）', '<canvas id="o-client" height="200"></canvas>')}
+    ${card('OPC防风险"四道防火墙"', `<div class="space-y-3">${d.firewalls.map(f => `<div class="flex gap-3"><span class="mt-1 w-2.5 h-2.5 rounded-full shrink-0 ${{ green: 'bg-emerald-500', yellow: 'bg-amber-500', red: 'bg-red-500' }[f.level]}"></span><div><div class="font-medium text-sm">${f.name}</div><div class="text-xs text-slate-500">${esc(f.text)}</div></div></div>`).join('')}</div>`)}
+  </div>
+  <div class="mt-4">${card('税务路径智能推荐（基于年化收入 ' + money(d.annualized) + '）', `<div class="grid md:grid-cols-4 gap-3">${d.compare.paths.map(p => `<div class="rounded-xl border p-4 ${p.key === d.compare.recommend ? 'border-brand-500 bg-brand-50' : ''}"><div class="text-xs text-slate-500">${p.name}</div><div class="text-2xl font-bold mt-1 ${p.key === d.compare.recommend ? 'text-brand-700' : ''}">${p.rate}%</div><div class="text-xs text-slate-500">综合税负 ${money(p.tax)}</div></div>`).join('')}</div><div class="mt-3 text-sm text-slate-600"><i class="fas fa-lightbulb text-amber-500 mr-1"></i>${d.compare.reason}</div>`)}</div>`;
+  chart('o-trend', { type: 'line', data: { labels: d.incomeTrend.map(x => x.period), datasets: [{ label: '收入', data: d.incomeTrend.map(x => x.amt), borderColor: '#2f5bea', tension: .3 }, { label: '成本', data: d.incomeTrend.map(x => d.expenseTrend.find(e => e.period === x.period)?.amt || 0), borderColor: '#f59e0b', tension: .3 }] }, options: { plugins: { legend: { position: 'bottom' } } } });
+  chart('o-client', { type: 'doughnut', data: { labels: d.byClient.map(x => x.client_name), datasets: [{ data: d.byClient.map(x => x.amt), backgroundColor: ['#2f5bea', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#64748b'] }] }, options: { plugins: { legend: { position: 'bottom' } } } });
+  $('#o-edit').onclick = () => { modal('主体设置', `<div class="grid md:grid-cols-2 gap-4">${input('p-name', '主体名称', o.name)}${select('p-type', '主体形态', Object.entries(ENT), o.entity_type)}${input('p-cap', '认缴注册资本', o.registered_capital, 'number')}${input('p-paid', '实缴资本', o.paid_capital, 'number')}${input('p-salary', '股东月工资（OPC）', o.owner_salary, 'number')}${input('p-sbase', '股东社保基数', o.owner_social_base, 'number')}${input('p-sd', '专项附加扣除（月）', o.owner_special_deduction, 'number')}${input('p-book', '年记账费', o.bookkeeping_fee, 'number')}${input('p-ind', '行业', o.industry)}${input('p-region', '地区', o.region)}</div>`, { footer: btn('取消', 'ghost', 'onclick="closeModal()"') + btn('保存', 'primary', 'id="p-save"') }); $('#p-save').onclick = async () => { await oapi.put('/profile', { name: v('p-name'), entity_type: v('p-type'), registered_capital: num('p-cap'), paid_capital: num('p-paid'), owner_salary: num('p-salary'), owner_social_base: num('p-sbase'), owner_special_deduction: num('p-sd'), bookkeeping_fee: num('p-book'), industry: v('p-ind'), region: v('p-region') }); toast('已保存'); closeModal(); route(); }; };
+};
+
+VIEWS.income = async () => {
+  const [{ data: inc }, { data: exp }] = await Promise.all([oapi.get('/incomes'), oapi.get('/expenses')]);
+  $('#view').innerHTML = `<div class="grid lg:grid-cols-2 gap-4">
+    ${card('收入台账（仅就真实业务开票）', table(['日期', '客户', '项目', '金额', '发票', '操作'], inc.map(i => [i.income_date, esc(i.client_name), esc(i.project || ''), money(i.amount), { none: badge('gray', '未开票'), normal: badge('blue', '普票'), special: badge('green', '专票') }[i.invoice_type] + (i.invoice_no ? `<div class="font-mono text-xs text-slate-400">${i.invoice_no}</div>` : ''), btn('删', 'ghost', `data-di="${i.id}"`)])), btn('<i class="fas fa-plus mr-1"></i>记一笔收入', 'primary', 'id="add-inc"'))}
+    ${card('成本台账（须有真实凭证，严禁买票冲成本）', table(['日期', '类别', '金额', '凭证', '备注', '操作'], exp.map(e => [e.expense_date, esc(e.category), money(e.amount), e.has_voucher ? badge('green', '有') : badge('red', '无'), esc(e.remark || ''), btn('删', 'ghost', `data-de="${e.id}"`)])), btn('<i class="fas fa-plus mr-1"></i>记一笔成本', 'primary', 'id="add-exp"'))}</div>`;
+  $('#add-inc').onclick = () => { modal('记一笔收入', `<div class="grid md:grid-cols-2 gap-4">${input('i-client', '客户名称 *')}${input('i-amount', '金额（元）*', '', 'number')}${input('i-project', '项目/服务内容')}${select('i-inv', '发票类型', [['none', '未开票'], ['normal', '增值税普通发票'], ['special', '增值税专用发票']])}${input('i-no', '发票号码')}${input('i-date', '收入日期', new Date().toISOString().slice(0, 10), 'date')}</div>`, { footer: btn('取消', 'ghost', 'onclick="closeModal()"') + btn('保存', 'primary', 'id="i-save"') }); $('#i-save').onclick = async () => { try { await oapi.post('/incomes', { client_name: v('i-client'), amount: num('i-amount'), project: v('i-project'), invoice_type: v('i-inv'), invoice_no: v('i-no'), income_date: v('i-date') }); toast('已记录'); closeModal(); route(); } catch (e) { toast(errMsg(e), 'error'); } }; };
+  $('#add-exp').onclick = () => { modal('记一笔成本', `<div class="grid md:grid-cols-2 gap-4">${select('e-cat', '类别', ['办公场地', '设备与软件', '算力与AI工具', '外协费用', '差旅', '培训', '保险', '记账服务', '其他'].map(x => [x, x]))}${input('e-amount', '金额（元）*', '', 'number')}${select('e-voucher', '是否取得合规凭证', [['1', '是（发票/完税凭证）'], ['0', '否']])}${input('e-date', '支出日期', new Date().toISOString().slice(0, 10), 'date')}<div class="md:col-span-2">${input('e-remark', '备注')}</div></div>`, { footer: btn('取消', 'ghost', 'onclick="closeModal()"') + btn('保存', 'primary', 'id="e-save"') }); $('#e-save').onclick = async () => { try { await oapi.post('/expenses', { category: v('e-cat'), amount: num('e-amount'), has_voucher: v('e-voucher') === '1', expense_date: v('e-date'), remark: v('e-remark') }); toast('已记录'); closeModal(); route(); } catch (e) { toast(errMsg(e), 'error'); } }; };
+  $$('[data-di]').forEach(b => b.onclick = async () => { if (confirm('删除该收入？')) { await oapi.del('/incomes/' + b.dataset.di); route(); } });
+  $$('[data-de]').forEach(b => b.onclick = async () => { if (confirm('删除该成本？')) { await oapi.del('/expenses/' + b.dataset.de); route(); } });
+};
+
+VIEWS.payroll = async () => {
+  const [{ data: rows }, { data: o }] = await Promise.all([oapi.get('/payrolls'), oapi.get('/profile')]);
+  const isCo = o.entity_type === 'company';
+  $('#view').innerHTML = `
+  ${!isCo ? `<div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 text-sm mb-4"><i class="fas fa-circle-info mr-1"></i>当前主体为 ${ENT[o.entity_type]}：${o.entity_type === 'sole_proprietor' ? '个体户业主不发工资，所得按经营所得计税（见"税务测算"）' : '自然人从业人员按劳务报酬累计预扣（见"税务测算"）'}。升级为一人有限公司后可使用"股东工资 + 分红"薪酬模式。</div>` : ''}
+  <div class="grid lg:grid-cols-3 gap-4">
+    <div>${card('本期薪酬方案 · ' + period(), `${input('s-salary', '股东月工资（元）', o.owner_salary, 'number')}<div class="mt-3">${input('s-div', '本期分红（元，可为0）', 0, 'number')}</div>
+      <div class="mt-4 flex gap-2">${btn('试算', 'ghost', `id="s-dry" ${isCo ? '' : 'disabled'}`)}${btn('生成薪酬单', 'primary', `id="s-save" ${isCo ? '' : 'disabled'}`)}</div>
+      <div class="mt-4 text-xs text-slate-500 bg-slate-50 rounded-lg p-3"><b>工资 vs 分红如何配比？</b><br>工资：计入公司成本（省5%企业所得税），个人按3%-45%累计预扣 + 社保；<br>分红：先缴5%企业所得税，再缴20%股息红利税，综合≈24%。<br>→ 工资累计预扣率低于24%的区间，适当提高工资比分红更优；同时须满足"合理工资薪金"真实性。</div>`)}</div>
+    <div class="lg:col-span-2"><div id="s-result"></div>${card('薪酬记录', table(['期间', '工资', '个人社保', '累计应纳税所得', '本期个税', '工资实发', '分红', '分红税', '状态', '操作'], rows.map(r => [r.period, money(r.owner_salary), money(r.personal_insurance), money(r.cum_taxable), money(r.tax), `<b>${money(r.net)}</b>`, money(r.dividend), money(r.dividend_tax), sbadge(r.status), r.status === 'calculated' ? btn('发放并生成申报', 'success', `data-pay="${r.period}"`) : '—'])))}</div></div>`;
+  const run = async dry => { try { const { data } = await oapi.post('/payrolls/calculate', { period: period(), owner_salary: num('s-salary'), dividend: num('s-div'), dry_run: dry }); $('#s-result').innerHTML = card('试算结果', `<div class="grid md:grid-cols-4 gap-3 text-sm">${[['工资实发', data.net], ['本期个税', data.tax], ['分红到手', data.dividend_net], ['股东本期现金合计', data.total_cash_to_owner]].map(([l, x]) => `<div class="rounded-lg bg-slate-50 p-3"><div class="text-xs text-slate-500">${l}</div><div class="font-bold">${money(x)}</div></div>`).join('')}</div>
+      <div class="mt-3 grid md:grid-cols-3 gap-3 text-xs"><div class="rounded-lg border p-3"><div class="text-slate-500">本年累计税前利润（估）</div><div class="font-bold">${money(data.detail.profit)}</div></div><div class="rounded-lg border p-3"><div class="text-slate-500">企业所得税（${data.detail.cit_rule.split('：')[0]}）</div><div class="font-bold">${money(data.detail.cit)}</div></div><div class="rounded-lg border p-3"><div class="text-slate-500">可分配税后利润</div><div class="font-bold">${money(data.detail.distributable)}</div></div></div>
+      ${data.detail.warn ? `<div class="mt-3 text-sm text-red-700 bg-red-50 rounded-lg p-3"><i class="fas fa-triangle-exclamation mr-1"></i>${esc(data.detail.warn)}</div>` : ''}
+      <div class="mt-3 text-xs text-slate-500">${esc(data.detail.formula)}</div><div class="mt-2 text-xs text-brand-700">${esc(data.detail.tip)}</div>` + (dry ? '' : '<div class="mt-2 text-emerald-600 text-sm">薪酬单已生成</div>')); if (!dry) setTimeout(route, 800); } catch (e) { toast(errMsg(e), 'error'); } };
+  $('#s-dry').onclick = () => run(true); $('#s-save').onclick = () => run(false);
+  $$('[data-pay]').forEach(b => b.onclick = async () => { await oapi.post(`/payrolls/${b.dataset.pay}/pay`); toast('已发放，扣缴申报草稿已生成'); route(); });
+};
+
+VIEWS.tax = async () => {
+  const { data: t } = await oapi.get('/tax/period', { period: period() });
+  const it = t.incomeTax;
+  $('#view').innerHTML = `
+  <div class="grid md:grid-cols-4 gap-4">${stat(period() + ' 收入', money(t.month_income), '', 'fa-sack-dollar')}${stat('本月成本（有凭证）', money(t.month_expense), '', 'fa-receipt', 'amber')}${stat('年度累计收入', money(t.ytd_income), `成本 ${money(t.ytd_expense)}`, 'fa-calendar', 'emerald')}${stat('近12个月累计', money(t.last12_income), t.register_alert || '未达500万元登记阈值', 'fa-gauge', t.register_alert ? 'red' : 'brand')}</div>
+  <div class="grid lg:grid-cols-2 gap-4 mt-4">
+    ${card('增值税及附加（本月）', `<div class="text-3xl font-bold ${t.vat.exempt ? 'text-emerald-600' : ''}">${t.vat.exempt ? '免征' : money(t.vat.vat + t.vat.surcharge)}</div><div class="text-sm text-slate-500 mt-1">增值税 ${money(t.vat.vat)} · 附加 ${money(t.vat.surcharge)}</div><div class="mt-3 text-sm bg-slate-50 rounded-lg p-3">${esc(t.vat.rule)}</div><div class="mt-2 text-xs text-slate-400">须合并全部销售额适用起征点，不得拆单、不得多平台分散。</div>`)}
+    ${card(it.type, `<div class="text-3xl font-bold">${money(it.tax)}</div>${it.rate != null ? `<div class="text-sm text-slate-500 mt-1">适用税率 ${pct(it.rate * 100)}${it.quick != null ? ' · 速算扣除 ' + money(it.quick) : ''}</div>` : ''}${it.ytd_profit != null ? `<div class="text-sm text-slate-500">年度累计应纳税所得额 ${money(it.ytd_profit)}</div>` : ''}${it.taxable != null ? `<div class="text-sm text-slate-500">累计应纳税所得额 ${money(it.taxable)}${it.reduction ? ' · 减半优惠 −' + money(it.reduction) : ''}</div>` : ''}<div class="mt-3 text-xs text-slate-500">${esc(it.formula || it.rule || it.note || '')}</div>`)}
+  </div>
+  <div class="mt-4">${card('三阶税负对比测算器', `<div class="grid md:grid-cols-5 gap-3 items-end">${input('x-income', '年收入', t.ytd_income ? Math.round(t.ytd_income / Math.max(1, parseInt(period().slice(5))) * 12) : 300000, 'number')}${input('x-cost', '真实成本率', 0.3, 'number', 'step="0.05"')}${input('x-salary', '股东月工资', 6000, 'number')}${input('x-book', '年记账费', 5000, 'number')}${btn('测算', 'primary', 'id="x-run"')}</div><div id="x-result" class="mt-4"></div>`)}</div>`;
+  const run = async () => { const { data } = await oapi.get('/tax/compare', { income: num('x-income'), cost_ratio: num('x-cost'), salary: num('x-salary'), book: num('x-book') }); $('#x-result').innerHTML = table(['路径', '综合税负', '税额合计', '明细', '税后净得'], data.paths.map(p => [p.key === data.recommend ? `<b class="text-brand-700">${p.name} <i class="fas fa-star text-amber-400"></i></b>` : p.name, `<b>${p.rate}%</b>`, money(p.tax), `<span class="text-xs text-slate-500">${Object.entries(p.detail).map(([k, x]) => `${{ iit: '个税', vat: '增值税', surcharge: '附加', cost: '成本', cit: '企业所得税', salaryTax: '工资个税', dividendTax: '分红税', profit: '利润', afterTaxProfit: '税后利润', salary: '工资', book: '记账' }[k] || k} ${fmt(x, 0)}`).join(' · ')}</span>`, money(p.net)])) + `<div class="mt-3 text-sm text-slate-600"><i class="fas fa-lightbulb text-amber-500 mr-1"></i>${data.reason}</div><div class="mt-1 text-xs text-slate-400">${data.caveat}</div>`; };
+  $('#x-run').onclick = run; run();
+};
+
+VIEWS.growth = async () => {
+  const { data: g } = await oapi.get('/growth');
+  $('#view').innerHTML = `
+  <div class="bg-white rounded-2xl border border-slate-200 p-5"><div class="flex items-center justify-between"><div><div class="text-sm text-slate-500">当前身份</div><div class="text-xl font-bold">${g.current_name}</div></div><div class="text-right"><div class="text-sm text-slate-500">年化收入 · 客户数</div><div class="text-xl font-bold">${money(g.annualized)} · ${g.clients}</div></div></div>
+    <div class="mt-6 grid md:grid-cols-3 gap-4">${g.stages.map(s => `<div class="rounded-2xl border p-5 relative ${s.key === g.recommended ? 'border-brand-500 bg-brand-50' : ''} ${s.key === g.current ? 'ring-2 ring-emerald-400' : ''}">${s.key === g.recommended ? '<span class="absolute -top-3 right-4 bg-brand-600 text-white text-xs px-2 py-0.5 rounded-full">AI推荐</span>' : ''}${s.key === g.current ? '<span class="absolute -top-3 left-4 bg-emerald-500 text-white text-xs px-2 py-0.5 rounded-full">当前</span>' : ''}<div class="font-bold text-brand-700">${s.stage}</div><div class="font-semibold mt-1">${s.identity}</div><div class="text-xs text-slate-500">${s.income}</div><div class="mt-3 text-xs"><div class="text-slate-400">税务路径</div>${s.tax}</div><div class="mt-2 text-xs"><div class="text-slate-400">平台服务</div>${s.services.join(' · ')}</div></div>`).join('')}</div>
+    <div class="mt-4 text-sm bg-amber-50 text-amber-800 rounded-xl p-4"><i class="fas fa-lightbulb mr-1"></i>${g.reason}<div class="text-xs mt-1 text-amber-700">${g.caveat}</div></div></div>
+  <div class="mt-4">${card('升级前置条件自检（真实经营）', `<div class="space-y-2">${g.checks.map(c => `<div class="flex items-center gap-3 text-sm"><i class="fas ${c.ok ? 'fa-circle-check text-emerald-500' : 'fa-circle-xmark text-red-500'}"></i><span>${c.item}</span><span class="text-xs text-slate-400 ml-auto">${esc(c.text)}</span></div>`).join('')}</div>`)}</div>`;
+};
+
+VIEWS.cabin = async () => {
+  const { data: g } = await oapi.get('/growth');
+  $('#view').innerHTML = `<p class="text-sm text-slate-500 mb-4">OPC"一站式经营舱"：代理记账由持证代账机构承接；保险由持牌经纪承接；平台不做自营金融。</p><div class="grid md:grid-cols-3 gap-4">${g.cabin.map((m, i) => `<div class="bg-white rounded-2xl border border-slate-200 p-5"><div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 grid place-items-center"><i class="fas ${['fa-store', 'fa-calculator', 'fa-gavel', 'fa-handshake', 'fa-robot', 'fa-umbrella'][i]}"></i></div><div class="font-bold mt-3">${m.module}</div><div class="text-sm text-slate-600 mt-1">${m.content}</div><div class="text-sm font-semibold text-brand-700 mt-3">${m.price}</div>${btn('咨询开通', 'ghost', `onclick="toast('已提交意向，顾问将在1个工作日内联系','info')" class="mt-3 text-xs"`)}</div>`).join('')}</div>`;
+};
